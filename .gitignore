@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets / local config
+.env
+*.local
+
+# Data / caches
+*.parquet
+.codegraph/
+data_cache/
+
+# Rust build artifacts (polyglot/signal_engine_rs)
+polyglot/**/target/
+*.whl
+
+# Julia
+polyglot/**/*.jl.cov
+
+# OS
+.DS_Store
