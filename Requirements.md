@@ -1,6 +1,6 @@
 # Blaque Baux — Requirements
 
-**Version:** 0.1 · **Last updated:** 2026-07-06 · **Status:** Phase 1 seed
+**Version:** 0.2 · **Last updated:** 2026-07-06 · **Status:** Phase 1 seed · **Base:** CherryPick (Julia)
 **Discipline:** Append-only. REQ-IDs are permanent (see `DOCUMENT-CONTROL.md`).
 
 This document states *what* must be true, not *how* it is achieved. Implementation
@@ -75,6 +75,12 @@ emission, not a post-hoc annotation.
 activation, and every transition is itself written to the audit log. No strategy
 activates outside the regime that authorizes it.
 
+### Governance
+
+**REQ-GOV-001** *[INVARIANT]* — Every model version placed into service is recorded in
+the version registry and is rollback-able to a prior serialized state. No model runs in
+production without a registry entry.
+
 ---
 
 ## 2. Features
@@ -97,3 +103,5 @@ end to end from `run_phase1.py` against cached data.
 | 2026-07-06 | DATA/SIM/RISK/EXEC/AUDIT/REGIME 00x | Initial seed of 10 invariants from integration plan | INVARIANT |
 | 2026-07-06 | REQ-AUDIT-002 | Added: lineage completeness as precondition of order emission | INVARIANT |
 | 2026-07-06 | REQ-RISK-001 | Reworded to state the guarantee, not the mechanism | INVARIANT |
+| 2026-07-06 | REQ-GOV-001 | Added: model version registry + rollback (maps to module_8_governance) | INVARIANT |
+| 2026-07-06 | all | Re-based on CherryPick (Julia). Module mappings/conformance now in design.md | — |

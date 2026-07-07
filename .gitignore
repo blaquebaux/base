@@ -1,26 +1,23 @@
-# Python
+# Julia
+/Manifest.toml.bak
+*.jl.cov
+*.jl.*.cov
+/deps/deps.jl
+.CondaPkg/
+
+# Python glue
 __pycache__/
 *.py[cod]
-*.egg-info/
-.pytest_cache/
 .venv/
-venv/
 
-# Secrets / local config
+# Secrets / local
 .env
 *.local
 
 # Data / caches
 *.parquet
-.codegraph/
 data_cache/
-
-# Rust build artifacts (polyglot/signal_engine_rs)
-polyglot/**/target/
-*.whl
-
-# Julia
-polyglot/**/*.jl.cov
+.codegraph/
 
 # OS
 .DS_Store

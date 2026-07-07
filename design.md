@@ -1,91 +1,57 @@
 # Blaque Baux — Design & Traceability
 
-**Version:** 0.1 · **Last updated:** 2026-07-06
+**Version:** 0.2 · **Last updated:** 2026-07-06 · **Base:** CherryPick (2026-05-31, Julia)
 
-This document maps requirements to the code that implements them and the tests that
-verify them. It also records, per requirement, how the guarantee is *enforced* and its
-*current conformance* against the consolidated codebase.
-
-## Architecture: three strata
-
-```
-                 ┌──────────────────────────────────────────────┐
-  EXECUTION      │  run_live.py                                  │
-  (hot path)     │    └─ orchestration/ (coordinator, pool_mgr,  │
-                 │        circuit_breaker, event_bus,            │
-                 │        optimizer_service)                     │
-                 │    └─ ibkr/ (connection, order_manager,       │
-                 │        borrow_feed)                            │
-                 └───────────────┬──────────────────────────────┘
-                                 │  REQ-DATA-001/002 boundary
-                                 │  (execution must NOT reach research)
-                 ┌───────────────┴──────────────────────────────┐
-  RESEARCH       │  run_phase1.py                                │
-  (cold path)    │    └─ data/ (fetcher)                         │
-                 │    └─ signal/ (cascade, factors)              │
-                 │    └─ optimizer/ (qp_solver)                  │
-                 │    └─ backtest/ (engine, metrics)             │
-                 └───────────────┬──────────────────────────────┘
-                                 │  migration target
-                 ┌───────────────┴──────────────────────────────┐
-  TARGET ARCH    │  polyglot/                                    │
-                 │    optimizer_jl/ (qp_solver.jl, six_sigma)    │
-                 │    signal_engine_rs/ (Rust)                   │
-                 │    rule_engine_hy/ (strategy_gate.hy)         │
-                 │    integration/ (bridges)                     │
-                 └──────────────────────────────────────────────┘
-```
+Maps each requirement to the Julia module that implements it and the **existing** test
+that verifies it, with enforcement mechanism and current conformance. The system already
+carries 650+ test cases; the spec layer's job here is to *connect requirements to that
+suite and expose the gaps*, not to write tests from zero.
 
 ## Enforcement tiers
-
-Each requirement is enforced by one of:
-- **static** — a build/CI rule (e.g. an import-boundary lint) makes a violation fail to build.
-- **runtime** — an assertion/guard raises at run time on violation.
-- **test** — a unit/integration test proves the property.
-- **manual** — reviewed by a human until automated.
+**static** (build/CI rule) · **runtime** (assert/guard raises) · **test** (suite assertion) · **manual**
 
 ## Conformance states
-
-`holds` · `at-risk` · **`VIOLATED`** · `partial` · `unknown` · `unimplemented`
+`holds` · `partial` · **`VIOLATED`** · `unknown` · `unimplemented`
+(Conformance is grounded in `CHERRY_PICK_NOTES.md` "Known Remaining Limitations" + direct code reads.)
 
 ## Traceability matrix
 
 | REQ-ID | Implementing module(s) | Verifying test(s) | Enforcement | Conformance (2026-07-06) |
 |---|---|---|---|---|
-| REQ-DATA-001 | `orchestration/coordinator.py`, `orchestration/pool_manager.py`, `data/fetcher.py` | *(none yet)* | static (import + call-shape lint) + runtime | **VIOLATED** — order path calls `data.fetcher.load_all` (`coordinator.py:178`, `pool_manager.py:464`), a bulk parquet loader documented as "the single call used by the backtest engine". Not a keyed hot-store lookup. |
-| REQ-DATA-002 | `run_live.py`, `ibkr/`, `orchestration/` | *(none yet)* | static (import-boundary lint) | at-risk — order path does not import `backtest`, but *does* import research-stratum `data.fetcher` (see DATA-001). Boundary needs a lint before it drifts further post-consolidation. |
-| REQ-SIM-001 | `backtest/engine.py` | *(none yet)* | runtime (raise on look-ahead) | unknown — sim-clock guard not yet audited. |
-| REQ-SIM-002 | `backtest/engine.py` | *(none yet)* | test | unknown — engine references "next bar" (`engine.py:167`) but fill timing not yet verified. |
-| REQ-RISK-001 | `orchestration/pool_manager.py`, `orchestration/optimizer_service.py`, `optimizer/qp_solver.py` | *(none yet)* | design (one coroutine per pool) + test | unknown — per-pool coroutine model suggests serialization; `optimizer_service.py` not yet audited for shared-solve interleaving. |
-| REQ-RISK-002 | `optimizer/qp_solver.py` | *(none yet)* | test + runtime | unknown — reject-reason logging not yet confirmed in solver. |
-| REQ-RISK-003 | `orchestration/pool_manager.py` | *(none yet)* | runtime (gate check) | partial — pool taxonomy exists (`EQUITIES_APAC/EMEA/US`, commodities, crypto, dte_overlay); budget-at-gate enforcement not confirmed. |
-| REQ-EXEC-001 | `ibkr/order_manager.py` | *(none yet)* | test | holds (pending test) — `_submit_orders` iterates orders serially per pool (`order_manager.py:146+`); pools are independent asyncio coroutines. Needs a test to lock in. |
-| REQ-AUDIT-001 | *(execution path — TBD)* | *(none yet)* | runtime | unimplemented — no lineage-carrying fill record found in sweep. |
-| REQ-AUDIT-002 | *(Trader gate — TBD)* | *(none yet)* | runtime (reject on incomplete lineage) | unimplemented. |
-| REQ-REGIME-001 | `polyglot/rule_engine_hy/strategy_gate.hy` (target); execution wiring TBD | *(none yet)* | runtime | unimplemented in execution path — regime gate exists only in target-arch stratum, not wired into `run_live.py`. |
+| REQ-DATA-001 | `module_1_data` (keyed access), `module_7_execution` | `test_module_1.jl`, `test_stratum_i.jl` | static + runtime | unknown — must audit that the execution path (`module_7`) uses keyed state, not bulk `module_1` loads. |
+| REQ-DATA-002 | `module_7_execution`, `module_12_sor` | `test_stratum_i/ii.jl` | static (import-graph) | unknown — verify `module_7`/`module_12` do not import `module_13` backtest / heavy analytics. |
+| REQ-SIM-001 | `module_11_cv` (purged K-Fold/CPCV), `module_13_portfolio/backtest.jl` | `test_backtest_integrity.jl` | runtime + test | **holds (likely)** — purged K-Fold explicitly removes look-ahead leakage (López de Prado); `backtest_validation.jl` computes MAE on clean folds. Confirm the raise-not-warn guard. |
+| REQ-SIM-002 | `module_13_portfolio/backtest.jl` | `test_backtest_integrity.jl` | test | unknown — confirm next-bar-open fill (not same-bar). |
+| REQ-RISK-001 | `module_13_portfolio` (PortfolioOpt), `module_6_cascade` (parallel pools) | `test_module_6.jl`, `test_stress.jl` | design + test | unknown — parallel-pool implementation present; verify no concurrent solves against one pool's budget. |
+| REQ-RISK-002 | `module_13_portfolio` (`costaware`, `robust`), `module_10_feedback` | *(none — module 13 untested)* | test + runtime | unknown — reject/zero-with-named-reason not confirmed; **module 13 has no unit test.** |
+| REQ-RISK-003 | `module_6_cascade` (APAC/EMEA/US sizing), `module_7_execution` | `test_module_6.jl` | runtime (gate) | partial — regional cascade sizing exists; per-pool budget enforced *at the gate before emission* not yet confirmed. |
+| REQ-EXEC-001 | `module_7_execution/ibkr_connection.jl`, `module_12_sor` | `test_module_7.jl` | runtime (`ReentrantLock`) + test | partial — thread-safe serial submission mechanism present (`ReentrantLock`, reconnect loop). BUT `send_order` is **simulated** (notes limitation #3); live TWS path (`Jib.jl`) not wired. Serialization holds; live execution unproven. |
+| REQ-AUDIT-001 | `module_10_feedback/execution_ledger.jl` (`FillRecord`, `ExecutionLedger`) | *(none — module 10 untested)* | runtime | **VIOLATED** — `FillRecord` carries execution-quality fields (impact, ADV, σ, materiality) but **no decision lineage**: missing `signal_id`, `regime`, `solve_id`, `order_id`. Ledger records *how well* a fill executed, not *what caused it*. |
+| REQ-AUDIT-002 | `module_10_feedback`, `module_7_execution` (gate) | *(none)* | runtime (reject on incomplete lineage) | unimplemented — no pre-emission lineage gate. Blocked on REQ-AUDIT-001 (fields must exist first). |
+| REQ-REGIME-001 | `module_4_arma`, `module_5_dpm`, `module_6_cascade`; logging via `module_8_governance` | `test_module_4/5/6.jl` | runtime | holds (impl) — regime machinery is the system core and is tested. Confirm every transition is written to the governance audit log. |
+| REQ-GOV-001 | `module_8_governance` (SQLite version registry, JLD2 serialize/rollback) | `test_module_8.jl` | runtime | holds — version registry + serialize/deserialize + rollback implemented and tested. |
 
-**The empty "Verifying test(s)" column is the Phase 2 backlog** (see `tasks.md`).
-Sequencing rule: audit/close the invariants whose conformance is `VIOLATED` or `unknown`
-before the ones that already `hold`.
+## Test coverage map (existing suite → strata)
 
-## Design appendices (existing framework documents)
+- **Module unit tests:** `test_module_1..8.jl` — modules **1–8 covered; 9–13 have no dedicated unit test.**
+- **Strata:** `test_stratum_i.jl`, `test_stratum_ii.jl` (structural + computational strata).
+- **Integrity/risk:** `test_backtest_integrity.jl`, `test_stress.jl`, `test_stress_scenarios.jl`, `test_integration.jl`, `test_geometric_consistency.jl`.
 
-These are referenced, not rewritten. They live in the user's document store:
+## Coverage gap (the real Phase-2 backlog)
 
-- **Gamma-ARMA framework** — `BlaqueBaux_GammaARMA_Framework.docx`, `BlaqueBaux_GammaARMA_v2.docx`
-  (governs REQ-REGIME-001)
-- **Three-strata statistical architecture** — `BlaqueBaux_StatisticalArchitecture.docx`
-  (the execution/research/target strata this repo is organized around)
-- **Pre-distribution review appendix** — `BlaqueBaux_PreDist_Review_Appendix.docx`
-- **Fleet architecture runbook** — `BlaqueBaux_Fleet_Architecture_Runbook.md`
-  (machine assignment; cf. `pool_manager.py` `machine_id`)
-- **PortfolioOpt.jl module docs** — target-arch optimizer (governs migration of `optimizer/qp_solver.py` → `polyglot/optimizer_jl/`)
+The invariants most at risk are the ones landing in **untested modules 9–13**:
+REQ-AUDIT-001 (mod 10), REQ-RISK-001/002 (mod 13), execution/SOR (mod 12), 0DTE (mod 9).
+These are the newest modules (Deepseek-v2 additions and extensions) and carry no unit
+tests. Coverage here is prioritized over the already-tested regime/data modules.
 
-## Known mechanism notes (the "how" kept out of Requirements.md)
+## Known limitations carried from CHERRY_PICK_NOTES.md (authoritative gap list)
 
-- **REQ-RISK-001 mechanism:** each pool runs as a single asyncio coroutine
-  (`pool_manager.py`), so solves within a pool are naturally ordered; a shared
-  `optimizer_service` must not break this — to be verified.
-- **REQ-DATA-001/002 mechanism (proposed):** an import-boundary lint that fails CI if
-  anything reachable from `run_live.py` imports `data/`, `signal/`, `optimizer/`, or
-  `backtest/`; plus a call-shape check that the hot path uses keyed getters, not `load_all`.
+1. `module_5` weighted M-step updates μ/σ² only, not full ARMA coefficients (approx at init).
+2. `module_5` regime likelihood uses mean+vol_scale, not full ARMA-GARCH conditional (cost).
+3. `module_7` `send_order` **simulated** — replace with `Jib.jl`/TWS (REQ-EXEC-001 live gap).
+4. `module_8` serialization now JLD2-backed (resolved in Deepseek-v2).
+5. `module_1` feeds wired to real endpoints (resolved in Deepseek-v2).
+
+## Design appendices
+`docs/appendices/`: `BlaqueBaux_GammaARMA_Framework.docx`, `BlaqueBaux_GammaARMA_v2.docx`,
+`BlaqueBaux_StatisticalArchitecture.docx`, `BlaqueBaux_PreDist_Review_Appendix.docx`.

@@ -1,41 +1,51 @@
 # Blaque Baux — Canonical Repository
 
-This is the consolidated, version-controlled root for the Blaque Baux algorithmic
-trading system. It was assembled from three previously divergent, uncommitted trees
-(`blaque_baux-v1`, `blaque_baux-v2`, `blaque_baux_polyglot`) that turned out to be
-**complementary strata of one system**, not competing versions.
+Version-controlled root for the Blaque Baux Gamma-ARMA trading system. Based on the
+**CherryPick** build (2026-05-31) — the current production-grade Julia implementation,
+itself a scored cherry-pick across seven implementations (Kimi base + Deepseek-v2
+integration; see `CHERRY_PICK_NOTES.md`).
 
-## The three strata
+> Earlier Python trees (`blaque_baux-v1/-v2/_polyglot`, ~April 2026) were prototypes and
+> are **superseded**. They remain in `Downloads/` and in this repo's git history (first
+> commit) for reference only.
 
-| Stratum | Directories | Role | Source tree |
-|---|---|---|---|
-| **Execution (hot path)** | `ibkr/`, `orchestration/`, `run_live.py` | Live order submission, per-pool coordination, circuit breakers | ex-`v1` |
-| **Research (cold path)** | `data/`, `signal/`, `optimizer/`, `backtest/`, `run_phase1.py` | Signal generation, QP optimization, backtesting, analytics | ex-`v2` |
-| **Target architecture** | `polyglot/` | Julia optimizer, Rust signal engine, Hy rule gate + integration bridges — the migration destination | ex-`polyglot` |
+## System layout (Julia, modules 1–13)
 
-The boundary between the Execution and Research strata is not incidental — it is the
-subject of the system's hardest safety invariants (see `Requirements.md`, REQ-DATA-001
-and REQ-DATA-002). The two strata were never previously in the same repository;
-consolidating them here is the first time a cross-stratum import is even *possible*,
-which is exactly why the spec layer and its enforcement rules now matter.
+| Module | Purpose | Key invariants |
+|---|---|---|
+| `module_1_data` | Ingestion, normalization, staleness (Cboe/FRED/Deribit/TGA) | REQ-DATA-001/002 |
+| `module_2_smoothing` | LOWESS / SG / adaptive median | — |
+| `module_3_pca` | Vol-surface + yield-curve PCA → 6-dim state | — |
+| `module_4_arma` | ARMA(p,q) + GARCH(1,1) QMLE | REQ-REGIME-001 |
+| `module_5_dpm` | Dirichlet Process Mixture (particle filter, EM) | REQ-REGIME-001 |
+| `module_6_cascade` | Cascade interface, regional sizing (APAC/EMEA/US) | REQ-REGIME-001, REQ-RISK-003 |
+| `module_7_execution` | IBKR execution, 4-state circuit breaker (`ReentrantLock`) | REQ-EXEC-001 |
+| `module_8_governance` | Version registry, serialization, rollback | REQ-GOV-001 |
+| `module_9_0dte` | 0DTE overlay | — |
+| `module_10_feedback` | Execution ledger (`FillRecord`), cascade feedback | REQ-AUDIT-001/002 |
+| `module_11_cv` | Purged K-Fold / CPCV (López de Prado) | REQ-SIM-001 |
+| `module_12_sor` | Smart order router (+ cuOpt GPU bridge) | REQ-EXEC-001 |
+| `module_13_portfolio` | PortfolioOpt (BL, mean-var, risk-based, robust, tail-risk, cost-aware) | REQ-RISK-001/002 |
+
+Strata implementations: `StructuralStatistics.jl`, `ComputationalStatistics.jl`,
+`GeometricCoordinationLayer.jl` (tested by `test/test_stratum_i.jl`, `test_stratum_ii.jl`).
+
+Orchestration: `scripts/run_daily_recursive.jl`, `run_em_weekly.jl`,
+`backtest_validation.jl`; Python glue `massive_client.py` (data/dashboard),
+`cuopt_bridge.py` (GPU SOR).
 
 ## The spec stack
 
-This repo carries a requirements/traceability layer on top of the existing design docs:
+- **`Requirements.md`** — invariants first, each with a permanent `REQ-ID`. Append-only.
+- **`design.md`** — traceability matrix: REQ → module → **existing test** → enforcement → conformance.
+- **`tasks.md`** — backlog: close conformance gaps, cover the untested modules 9–13.
+- **`TESTPLAN.md`** — verification, mapped onto the existing 650+-case suite.
+- **`DOCUMENT-CONTROL.md`** — versioning + invariant-change sign-off.
+- **`docs/appendices/`** — Gamma-ARMA framework, Statistical Architecture, Pre-Dist Review (`.docx`).
 
-- **`Requirements.md`** — invariants first (the things that must never be violated,
-  each with a `REQ-ID`), features second. Append-only.
-- **`design.md`** — architecture + the **traceability matrix** (REQ → module → test →
-  conformance → enforcement). References the existing framework documents as appendices.
-- **`tasks.md`** — the Phase 2 backlog, derived from empty test cells and open conformance gaps.
-- **`TESTPLAN.md`** — how each REQ is verified.
-- **`DOCUMENT-CONTROL.md`** — versioning, change-log, and sign-off rules.
+## Run
 
-## Component READMEs
-
-- `README-v2-python.md` — original research-stratum README
-- `polyglot/README-polyglot.md` — original target-architecture README
-
-## Status
-
-Phase 1 (spec skeleton + consolidation) — in place. See `tasks.md` for open work.
+```bash
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. test/runtests.jl
+```
