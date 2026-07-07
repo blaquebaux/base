@@ -1,6 +1,6 @@
 # Blaque Baux — Requirements
 
-**Version:** 0.2 · **Last updated:** 2026-07-06 · **Status:** Phase 1 seed · **Base:** CherryPick (Julia)
+**Version:** 0.3 · **Last updated:** 2026-07-06 · **Status:** Phase 1 seed · **Base:** CherryPick (Julia)
 **Discipline:** Append-only. REQ-IDs are permanent (see `DOCUMENT-CONTROL.md`).
 
 This document states *what* must be true, not *how* it is achieved. Implementation
@@ -24,19 +24,37 @@ not here — this document states the target, not today's state.
 data is obtained only by keyed lookups against the hot store. The execution path
 performs no bulk loads, table scans, or aggregations to make a trading decision.
 
-**REQ-DATA-002** *[INVARIANT]* — No module on the order path depends on the analytics
-engine (the DuckDB / Julia backtest stack, or any bulk-load data facility built for
-research). The dependency graph from the live entrypoint (`run_live.py`) must not
-reach research-stratum code.
+**REQ-DATA-002** *[INVARIANT]* — No module on the order path depends on the
+research / analytics stratum. The dependency graph reachable from the live execution
+entrypoint must not reach research-stratum code.
+*(De-mechanized: the specific engine — DuckDB, Parquet, the Julia backtest stack — is a
+mechanism named in `design.md`, not here. The one permitted cross-language seam on the
+order path, the SOR → cuOpt solver, is a solver dependency, not a research dependency;
+see `design.md`.)*
+
+**REQ-DATA-003** *[INVARIANT]* *(added Phase 1)* — The execution path must not act on
+market data older than a per-venue staleness threshold. A stale feed halts emission for
+the affected pool; it does not warn and proceed. (A frozen feed still serving the last
+tick during a 23-hour commodities or discrete crypto window is a realistic failure mode.)
 
 ### Simulation integrity
 
-**REQ-SIM-001** *[INVARIANT]* — No component may consume market data timestamped later
-than the simulation clock's current time. A look-ahead access raises an error; it must
-never merely warn or silently proceed.
+**REQ-SIM-001** *[INVARIANT]* — During a backtest run, no component may consume market
+data timestamped later than the simulation clock's current time. This is a **runtime
+chokepoint**: any data access checked against the sim clock; a future-dated request
+raises, never warns. (Distinct from CV leakage — see REQ-SIM-003.)
 
 **REQ-SIM-002** *[INVARIANT]* — In backtest, a decision made on a bar fills at the
-**next** bar's open. Same-bar fills are prohibited.
+**next** bar's open. Same-bar fills are prohibited. "Next bar" is defined per pool/venue
+(equities session, 23-hour commodities, discrete crypto windows, 0DTE ORB) — the
+per-venue bar semantics must be specified before this requirement's test is written, so
+the test does not encode one venue's assumption as universal.
+
+**REQ-SIM-003** *[INVARIANT]* *(added Phase 1)* — Model validation uses leakage-free
+cross-validation: no label or observation may leak across CV folds (purged K-Fold / CPCV
+per López de Prado). A performance estimate computed on leaked folds is invalid and must
+not be recorded to governance. (This protects research methodology at fold-construction
+time — a different mechanism from REQ-SIM-001's runtime clock.)
 
 ### Risk / optimization
 
@@ -53,10 +71,25 @@ carries a named, machine-readable reason, written to the audit trail. No silent 
 other pool) is enforced at the Trader gate, before an order is emitted — not by any
 downstream component after emission.
 
+**REQ-RISK-004** *[INVARIANT]* *(added Phase 1 — live-capital)* — Each pool has a daily
+loss limit. On breach, new order emission for that pool halts until an explicit, logged
+human re-enable. Nothing else in this set stops a correctly-serialized, fully-lineaged,
+regime-authorized system from losing money continuously all day; this does.
+
 ### Execution
 
 **REQ-EXEC-001** *[INVARIANT]* — Order submission to IBKR is strictly serial within a
 pool. At most one submission for a given pool is outstanding at a time.
+
+**REQ-EXEC-002** *[INVARIANT]* *(added Phase 1 — live-capital)* — Order submission is
+idempotent across reconnects. A retry after connection loss must not double-submit. The
+reconnect loop is exactly where duplicate orders are born; per-pool serialization does
+not address it. This must shape the real-TWS (`Jib.jl`) implementation, not chase it.
+
+**REQ-EXEC-003** *[INVARIANT]* *(added Phase 1 — live-capital)* — Internal position
+state reconciles against broker-reported state on a defined cadence. Unexplained
+divergence halts emission for the affected pool. Ledger-vs-broker drift is the classic
+silent failure of small live systems.
 
 ### Audit / lineage
 
@@ -81,6 +114,10 @@ activates outside the regime that authorizes it.
 the version registry and is rollback-able to a prior serialized state. No model runs in
 production without a registry entry.
 
+**REQ-GOV-002** *[INVARIANT]* *(added Phase 1 — live-capital)* — A manual kill switch
+stops all new order emission within a bounded time, and the halt event is itself
+audit-logged. Cheap to specify now; miserable to retrofit under stress.
+
 ---
 
 ## 2. Features
@@ -91,8 +128,8 @@ degrades the system but does not breach a safety guarantee.)*
 **REQ-FEAT-001** *[FEATURE]* — The live runner supports the canonical pool set
 (equities APAC/EMEA/US, commodities, crypto, DTE overlay) as independently schedulable units.
 
-**REQ-FEAT-002** *[FEATURE]* — The research stratum can reproduce a Phase 1 backtest
-end to end from `run_phase1.py` against cached data.
+**REQ-FEAT-002** *[FEATURE]* — The research stratum can reproduce a walk-forward backtest
+end to end (`scripts/backtest_validation.jl`) against cached data.
 
 ---
 
@@ -105,3 +142,9 @@ end to end from `run_phase1.py` against cached data.
 | 2026-07-06 | REQ-RISK-001 | Reworded to state the guarantee, not the mechanism | INVARIANT |
 | 2026-07-06 | REQ-GOV-001 | Added: model version registry + rollback (maps to module_8_governance) | INVARIANT |
 | 2026-07-06 | all | Re-based on CherryPick (Julia). Module mappings/conformance now in design.md | — |
+| 2026-07-06 | REQ-DATA-002 | De-mechanized: removed named engine (DuckDB); anchor fixed to the Julia live entrypoint | INVARIANT |
+| 2026-07-06 | REQ-SIM-001 | Clarified as a runtime clock chokepoint (distinct from CV leakage) | INVARIANT |
+| 2026-07-06 | REQ-SIM-002 | Added per-pool/venue bar-semantics precondition before test | INVARIANT |
+| 2026-07-06 | REQ-SIM-003 | Added: leakage-free CV (purged K-Fold/CPCV) — was protecting the system with no REQ | INVARIANT |
+| 2026-07-06 | REQ-DATA-003, REQ-RISK-004, REQ-EXEC-002/003, REQ-GOV-002 | Added five live-capital invariants (staleness halt, loss halt, idempotent submission, reconciliation, kill switch) | INVARIANT |
+| 2026-07-06 | REQ-FEAT-002 | Fixed stale `run_phase1.py` anchor → `backtest_validation.jl` | FEATURE |
