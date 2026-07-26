@@ -16,10 +16,13 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
 - **Order execution is PAPER, not live.** [verified] `module_7` `send_order` is a
   simulation (CHERRY_PICK_NOTES limitation #3). The real broker path (`Jib.jl`/TWS) is
   referenced but not wired. No real capital has been routed by this codebase.
-- **The live-capital invariants that make live trading safe are mostly unbuilt.**
-  [verified] REQ-EXEC-002 (idempotency), REQ-EXEC-003 (reconciliation), REQ-GOV-002 (kill
-  switch) are `unimplemented`; REQ-RISK-004 (loss halt) and REQ-DATA-003 (staleness halt)
-  are `unknown`/`partial`. **Going live before these exist is the headline risk.**
+- **The live-capital invariants now have enforcement logic (controller-verified), but the
+  live path is not proven.** [verified 2026-07-26] EXEC-001/002/003, RISK-003/004,
+  DATA-003, GOV-002, AUDIT-001/002 are all implemented in the governed controller and pass
+  the 30/30 smoke test. What is NOT yet proven: the IBKR adapter's Jib calls (#4), the
+  runner integration that feeds PnL/staleness/fills and wires the audit + ledger, and a
+  formal in-repo test suite (step 6). **The headline risk is now integration + adapter
+  verification, not missing controls.**
 - **Data feeds are partially real.** [asserted, per CHERRY_PICK_NOTES] Cboe/FRED/Deribit/
   TGA endpoints wired (Deepseek-v2); but OIS-SOFR is a 5bps placeholder and GSW zero-coupon
   yields require a manual Fed download (FRED DGS = par yields, not zero). Treat any curve-
@@ -43,13 +46,19 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
   the runtime look-ahead question (REQ-SIM-001), which is **not** protected — a backtest
   run could still read a future bar mid-loop (no sim-clock chokepoint found).
 
-## Spec-vs-code summary (mirrors design.md, 2026-07-06)
+## Spec-vs-code summary (mirrors design.md, 2026-07-26)
 
-- **1 VIOLATED:** REQ-AUDIT-001 — `FillRecord` has no decision lineage (P0 fix pending).
-- **~6 unimplemented/unknown live-capital invariants** (see above).
+- **0 VIOLATED.** REQ-AUDIT-001 fixed (FillRecord carries + requires lineage).
 - **holds:** REQ-GOV-001 (version registry), REQ-SIM-003 (CV), REQ-REGIME-001 (impl).
-- **Test coverage cliff:** modules 1–8 tested (~650 cases); modules 9–13 (incl. the
-  execution ledger and portfolio/risk optimizers) have no dedicated unit tests.
+- **partial (enforced in the controller, logic verified by the 30/30 smoke test; formal
+  test + adapter/integration pending):** AUDIT-001/002, EXEC-001/002/003, RISK-003/004,
+  DATA-003, GOV-002.
+- **unimplemented / unknown:** SIM-001 (runtime clock chokepoint), SIM-002 (per-venue bar
+  semantics), DATA-001/002 (import-boundary lint), RISK-001/002 (module 13 concurrency /
+  reject-reasons).
+- **Test coverage cliff:** modules 1–8 tested (~650 cases); modules 9–13 still have no
+  in-repo unit tests (module 10 now carries lineage; the controller has a scratchpad smoke
+  test to be formalized in step 6).
 
 ## What this means for VC / allocator conversations
 
