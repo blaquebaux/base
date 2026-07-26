@@ -46,6 +46,7 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
 
         jib = Jib.Order()
         jib.orderId       = assigned_oid
+        jib.orderRef      = o.client_order_id   # broker echoes our idempotency key (REQ-EXEC-002)
         jib.action        = o.side === :buy ? "BUY" : "SELL"
         jib.totalQuantity = o.quantity
         jib.orderType     = o.order_type === :limit ? "LMT" : "MKT"

@@ -10,7 +10,7 @@ export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        ExecutionVenue, VenueOrder, OrderAck,
        connect!, disconnect!, is_connected, submit!, cancel!, positions,
        IBKRVenue, IBKRConfig, IBKRConnection, drain_pending_fills,
-       ExecutionController, submit_governed!, halt!, resume!
+       ExecutionController, submit_governed!, halt!, resume!, reconcile!, rehydrate!
 
 # ============================================================================
 # Order Types and Structures

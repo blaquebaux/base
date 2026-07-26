@@ -30,10 +30,12 @@ connection code come first.
       integrity), venue-owned connection (removed global singleton), reject fractional
       equity shares. Verified no export collisions. Open: Jib API unverified until a paper
       Gateway run (#4).
-- [ ] **Step 2 — REQ-EXEC-002 (idempotency) + REQ-EXEC-003 (reconciliation).** Dedup on
-      `client_order_id` in `submit_governed!` (return prior ack on repeat); reconcile vs
-      `venue positions()` on a cadence, halt-on-divergence. Do first — they live in the
-      reconnect path.
+- [x] **Step 2 — REQ-EXEC-002 (idempotency) + REQ-EXEC-003 (reconciliation).** Controller
+      dedups on `client_order_id` (replay returns prior ack, never re-submits); key stamped
+      as IBKR `orderRef`; `rehydrate!` hook for cross-restart. `reconcile!` compares expected
+      vs broker positions and halts on divergence. Both `partial` (see design.md): cross-
+      restart idempotency + authoritative expected-positions land with the ledger (step 3);
+      per-pool halt with step 4.
 - [ ] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002.** Add `signal_id/regime/solve_id/
       order_id` to `FillRecord`; reject any order with incomplete lineage at the controller gate.
 - [ ] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (daily loss halt).** Per-pool
