@@ -185,56 +185,30 @@ end
 # ── Order submission ──────────────────────────────────────────────────────────
 
 """
-    ibkr_send_order(order::IBKROrder) -> (success, order_id, error)
+    reserve_and_place(build::Function) -> (success, order_id, error)
 
-Place an order via Jib.jl placeOrder(). Constructs Jib Contract and Order
-objects from the IBKROrder, then calls Jib.Requests.placeOrder.
+Allocate the next IBKR order id and place the order under a SINGLE lock, so
+submission is strictly serial per connection and the order-id allocation is
+atomic with the placement (REQ-EXEC-001).
 
-The fill arrives asynchronously via the execDetails callback and is placed
-on ibkr.pending_fills for the FeedbackLayer.ExecutionLedger to consume.
+`build(oid::Int) -> (contract::Jib.Contract, order::Jib.Order)` constructs the
+Jib objects for the reserved id; this function calls `Jib.Requests.placeOrder`.
+The fill arrives asynchronously via the `execDetails` callback and lands on
+`ibkr.pending_fills` for the FeedbackLayer.ExecutionLedger to consume.
+
+Venue-specific translation of a canonical `VenueOrder` lives in `venues/ibkr.jl`;
+this primitive is order-model-agnostic on purpose.
 """
-function ibkr_send_order(order::IBKROrder)::Tuple{Bool, String, Union{Nothing,String}}
+function reserve_and_place(build::Function)::Tuple{Bool, String, Union{Nothing,String}}
     ibkr = get_ibkr_connection()
     lock(ibkr._lock) do
         !ibkr.is_connected && return (false, "", "Not connected to IBKR")
-
         try
             oid = ibkr.next_order_id
             ibkr.next_order_id += 1
-
-            # Build Jib Contract
-            contract = Jib.Contract()
-            contract.symbol      = order.symbol
-            contract.secType     = _sectype(order)
-            contract.exchange    = get(ENV, "IBKR_EXCHANGE", "SMART")
-            contract.currency    = "USD"
-
-            # For options: set expiry, strike, right
-            if hasproperty(order, :expiry) && !isempty(order.expiry)
-                contract.lastTradeDateOrContractMonth = order.expiry
-                contract.strike    = order.strike
-                contract.right     = order.right   # "C" or "P"
-                contract.multiplier = "100"
-            end
-
-            # Build Jib Order
-            jib_order = Jib.Order()
-            jib_order.orderId       = oid
-            jib_order.action        = order.action   # "BUY" or "SELL"
-            jib_order.totalQuantity = float(order.quantity)
-            jib_order.orderType     = order.order_type   # "MKT", "LMT", etc.
-            jib_order.tif           = get(order, :tif, "DAY")
-
-            if order.order_type == "LMT" && hasproperty(order, :limit_price)
-                jib_order.lmtPrice = order.limit_price
-            end
-            if hasproperty(order, :account) && !isempty(order.account)
-                jib_order.account = order.account
-            end
-
+            contract, jib_order = build(oid)
             Jib.Requests.placeOrder(ibkr.conn, oid, contract, jib_order)
-
-            @info "Order placed via Jib" symbol=order.symbol qty=order.quantity order_type=order.order_type oid=oid
+            @info "Order placed via Jib" symbol=contract.symbol oid=oid
             return (true, string(oid), nothing)
         catch e
             return (false, "", "Order error: $e")
@@ -336,11 +310,3 @@ function ibkr_req_sec_def_opt_params(
     return req_id
 end
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
-
-function _sectype(order)::String
-    if hasproperty(order, :sec_type)
-        return order.sec_type
-    end
-    return "STK"
-end

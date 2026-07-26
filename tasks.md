@@ -1,6 +1,6 @@
 # Blaque Baux — Tasks
 
-**Version:** 0.3 · **Last updated:** 2026-07-06 · **Base:** CherryPick (Julia)
+**Version:** 0.3 · **Last updated:** 2026-07-26 · **Base:** CherryPick (Julia)
 
 Backlog from the traceability matrix (`design.md`), ordered by invariant severity ×
 conformance risk. The system already has 650+ tests; the work is closing conformance
@@ -13,26 +13,38 @@ gaps and covering the untested newest modules — not writing a suite from scrat
       fields only (impact, ADV, σ, materiality). Add `signal_id`, `regime`, `solve_id`,
       `order_id` so every fill carries signal → regime → solve → order provenance.
 
-## P1 — must shape the coming `Jib.jl` execution work (not chase it)
+## P1 — execution build (venue-adapter, IBKR first, paper-only)
 
-The real-broker replacement of the simulated `send_order` cannot be a drop-in. Design
-these invariants *into* it:
+Venue-adapter architecture adopted (over cloning): one governed controller, thin adapter
+per broker, venue chosen by deployment config. Sequenced so invariants that shape the
+connection code come first.
 
-- [ ] **REQ-EXEC-002 (idempotency)** — Give order submission an idempotency key so a retry
-      after connection loss cannot double-submit. The reconnect loop in
-      `ibkr_connection.jl` is where duplicates are born; the `ReentrantLock` does nothing
-      about it. **Highest-risk gap once live.**
-- [ ] **REQ-EXEC-003 (reconciliation)** — Reconcile internal position state against
-      broker-reported state on a defined cadence; unexplained divergence halts the pool.
-- [ ] **REQ-EXEC-001** — Replace simulated `send_order` with `Jib.jl`/TWS, preserving the
-      `ReentrantLock` serialization. (CHERRY_PICK_NOTES limitation #3.) Do after EXEC-002/003 design.
-- [ ] **REQ-AUDIT-002** — Gate emission on complete lineage: reject any order missing a
-      lineage field at the `module_7` gate, never log-and-send. Depends on P0.
+- [x] **Step 1 — venue interface + IBKR adapter skeleton.** `ExecutionVenue` interface
+      (`venue_interface.jl`), `IBKRVenue` over Jib.jl (`venues/ibkr.jl`), connection/reconnect
+      wired (`ibkr_connection.jl`, was dead code), venue-agnostic controller skeleton
+      (`execution_controller.jl`) with the kill switch (REQ-GOV-002) enforced and every
+      other invariant marked as an explicit governance gap. Fixed the order-model bug in
+      the old Jib code. Parses clean under Julia 1.12.
+- [ ] **Step 2 — REQ-EXEC-002 (idempotency) + REQ-EXEC-003 (reconciliation).** Dedup on
+      `client_order_id` in `submit_governed!` (return prior ack on repeat); reconcile vs
+      `venue positions()` on a cadence, halt-on-divergence. Do first — they live in the
+      reconnect path.
+- [ ] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002.** Add `signal_id/regime/solve_id/
+      order_id` to `FillRecord`; reject any order with incomplete lineage at the controller gate.
+- [ ] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (daily loss halt).** Per-pool
+      budget check before emission; loss-limit breach halts the pool until logged human re-enable.
+- [ ] **Step 5 — REQ-GOV-002 finish.** Bounded-time halt guarantee + write halt events to
+      the `module_8_governance` audit log.
+- [ ] **Step 6 — tests** for the controller + IBKR adapter (closes part of the module 9–13
+      coverage cliff; verifies EXEC-001/002/003, AUDIT, RISK, GOV).
 - [ ] **REQ-DATA-002** — Import-graph check: exec modules 7/12 must not `include`/`using`
       research modules (`module_13` backtest). Whitelist the `module_12 → cuopt_bridge.py`
       HTTP solver seam. (Julia-internal scope confirmed — see design.md Entrypoints.)
 - [ ] **REQ-REGIME-001** — Confirm every regime transition is written to the
       `module_8_governance` audit log (not just applied).
+
+*Alpaca is a later `venues/alpaca.jl` adapter selected by deployment config on a second
+fleet machine — not a repo clone. The governed controller above is built once.*
 
 ## P1b — remaining live-capital invariants
 

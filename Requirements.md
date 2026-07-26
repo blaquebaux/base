@@ -1,6 +1,6 @@
 # Blaque Baux — Requirements
 
-**Version:** 0.3 · **Last updated:** 2026-07-06 · **Status:** Phase 1 seed · **Base:** CherryPick (Julia)
+**Version:** 0.3 · **Last updated:** 2026-07-26 · **Status:** Phase 1 seed · **Base:** CherryPick (Julia)
 **Discipline:** Append-only. REQ-IDs are permanent (see `DOCUMENT-CONTROL.md`).
 
 This document states *what* must be true, not *how* it is achieved. Implementation
@@ -78,8 +78,13 @@ regime-authorized system from losing money continuously all day; this does.
 
 ### Execution
 
-**REQ-EXEC-001** *[INVARIANT]* — Order submission to IBKR is strictly serial within a
-pool. At most one submission for a given pool is outstanding at a time.
+*Execution is venue-agnostic: the engine talks to a broker only through the
+`ExecutionVenue` interface, and all order-path invariants below are enforced in the
+venue-agnostic `ExecutionController` (built once). IBKR is the first adapter; Alpaca is a
+later adapter, selected by deployment config — not a code fork. See `design.md`.*
+
+**REQ-EXEC-001** *[INVARIANT]* — Order submission to the execution venue is strictly
+serial within a pool. At most one submission for a given pool is outstanding at a time.
 
 **REQ-EXEC-002** *[INVARIANT]* *(added Phase 1 — live-capital)* — Order submission is
 idempotent across reconnects. A retry after connection loss must not double-submit. The
@@ -148,3 +153,4 @@ end to end (`scripts/backtest_validation.jl`) against cached data.
 | 2026-07-06 | REQ-SIM-003 | Added: leakage-free CV (purged K-Fold/CPCV) — was protecting the system with no REQ | INVARIANT |
 | 2026-07-06 | REQ-DATA-003, REQ-RISK-004, REQ-EXEC-002/003, REQ-GOV-002 | Added five live-capital invariants (staleness halt, loss halt, idempotent submission, reconciliation, kill switch) | INVARIANT |
 | 2026-07-06 | REQ-FEAT-002 | Fixed stale `run_phase1.py` anchor → `backtest_validation.jl` | FEATURE |
+| 2026-07-26 | REQ-EXEC-001 | De-mechanized IBKR → "execution venue"; execution is now venue-agnostic (adapter pattern) | INVARIANT |

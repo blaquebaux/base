@@ -5,7 +5,12 @@ using Dates, Sockets, Logging, TimeZones
 export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        check_emergency_liquidation, send_order, cancel_order,
        get_current_positions, LatencyMetrics,
-       apply_position_floor
+       apply_position_floor,
+       # Venue-adapter execution (venue-agnostic governed path)
+       ExecutionVenue, VenueOrder, OrderAck,
+       connect!, disconnect!, is_connected, submit!, cancel!, positions,
+       IBKRVenue, IBKRConfig, get_ibkr_connection, drain_pending_fills,
+       ExecutionController, submit_governed!, halt!, resume!
 
 # ============================================================================
 # Order Types and Structures
@@ -383,5 +388,18 @@ function apply_position_floor(
     end
     return quantity
 end
+
+# ============================================================================
+# Venue-adapter execution layer
+# ----------------------------------------------------------------------------
+# Order matters: interface first, then connection primitives, then the IBKR
+# adapter, then the venue-agnostic governed controller. The legacy simulated
+# `send_order` above is retained for backward compatibility and will be retired
+# once `submit_governed!` is fully wired (steps 2–5).
+# ============================================================================
+include("venue_interface.jl")
+include("ibkr_connection.jl")     # was dead code; now wired. `using Jib` lives inside.
+include("venues/ibkr.jl")
+include("execution_controller.jl")
 
 end  # module ExecutionLayer
