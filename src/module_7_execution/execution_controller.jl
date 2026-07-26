@@ -38,17 +38,28 @@ mutable struct ExecutionController{V<:ExecutionVenue}
     pool_daily_pnl::Dict{String,Float64}   # pool_id -> current daily PnL (engine-supplied)
     halted_pools::Dict{String,String}      # pool_id -> halt reason (per-pool halt)
     symbol_pool::Dict{String,String}       # symbol -> pool_id (for per-pool reconcile halt)
+    # ── step 5 ──
+    audit::Function                        # halt/resume audit sink (REQ-GOV-002)
+    pool_max_staleness::Dict{String,Millisecond}  # pool_id -> max feed age (REQ-DATA-003)
+    pool_data_ts::Dict{String,DateTime}    # pool_id -> last time the pool's feed was fresh
 end
 
 # recon_tolerance default is a small epsilon (F4): catches any ≥1-share divergence while
 # ignoring float-accumulation noise. Raise it for a deliberate business tolerance.
-ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=1e-6) =
+# `audit` receives halt/resume events (REQ-GOV-002); the runner wires it to the
+# module_8 governance audit log. Default is a no-op (events still hit the logger).
+ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=1e-6,
+                    audit::Function = (_) -> nothing) =
     ExecutionController(v, false, nothing, account,
                         Dict{String,OrderAck}(), Dict{String,NamedTuple}(),
                         Dict{String,Float64}(), float(recon_tolerance),
                         Dict{String,Float64}(), Dict{String,Float64}(),
                         Dict{String,Float64}(), Dict{String,Float64}(),
-                        Dict{String,String}(), Dict{String,String}())
+                        Dict{String,String}(), Dict{String,String}(),
+                        audit, Dict{String,Millisecond}(), Dict{String,DateTime}())
+
+"Replace the halt/resume audit sink (REQ-GOV-002)."
+set_audit_sink!(ctrl::ExecutionController, f::Function) = (ctrl.audit = f; nothing)
 
 # ── Per-pool configuration (step 4) ────────────────────────────────────────────
 
@@ -60,19 +71,39 @@ set_pool_budget!(ctrl::ExecutionController, pool_id::String, cap::Real) =
 set_pool_loss_limit!(ctrl::ExecutionController, pool_id::String, limit::Real) =
     (ctrl.pool_loss_limit[pool_id] = abs(float(limit)); nothing)
 
+"Set a pool's maximum acceptable feed staleness (REQ-DATA-003). `max_age` is any Period."
+set_pool_staleness!(ctrl::ExecutionController, pool_id::String, max_age::Period) =
+    (ctrl.pool_max_staleness[pool_id] = convert(Millisecond, max_age); nothing)
+
+"Record that a pool's market-data feed is fresh as of `ts` (REQ-DATA-003). The engine calls
+this whenever module_1 delivers non-stale data for the pool."
+mark_data_fresh!(ctrl::ExecutionController, pool_id::String; ts::DateTime = now(UTC)) =
+    (ctrl.pool_data_ts[pool_id] = ts; nothing)
+
 # ── Kill switch (REQ-GOV-002) ──────────────────────────────────────────────────
 
+"""
+    halt!(ctrl, reason)  — REQ-GOV-002 kill switch
+
+Stops all new emission. **Bounded time:** this sets a flag that `submit_governed!` checks
+synchronously, and submissions are serialized by the venue lock — so once `halt!` returns,
+at most one already-in-flight order can still complete and no new order starts. The halt
+event is sent to the audit sink (the runner wires it to the module_8 governance log).
+"""
 function halt!(ctrl::ExecutionController, reason::String)
     ctrl.halted = true
     ctrl.halt_reason = reason
-    @warn "EXECUTION HALTED (REQ-GOV-002)" reason=reason   # STEP 5: also write to governance audit log
+    @warn "EXECUTION HALTED (REQ-GOV-002)" reason=reason
+    ctrl.audit((event=:halt, scope=:global, reason=reason, ts=now(UTC)))
     return nothing
 end
 
 function resume!(ctrl::ExecutionController)
-    @warn "EXECUTION RESUMED — logged human re-enable" prior_reason=ctrl.halt_reason
+    prior = ctrl.halt_reason
+    @warn "EXECUTION RESUMED — logged human re-enable" prior_reason=prior
     ctrl.halted = false
     ctrl.halt_reason = nothing
+    ctrl.audit((event=:resume, scope=:global, prior_reason=prior, ts=now(UTC)))
     return nothing
 end
 
@@ -81,7 +112,8 @@ end
 "Halt new emission for one pool (per-pool kill). Reason is logged and recorded."
 function halt_pool!(ctrl::ExecutionController, pool_id::String, reason::String)
     ctrl.halted_pools[pool_id] = reason
-    @warn "POOL HALTED" pool_id=pool_id reason=reason   # STEP 5: also to governance audit log
+    @warn "POOL HALTED" pool_id=pool_id reason=reason
+    ctrl.audit((event=:halt, scope=:pool, pool_id=pool_id, reason=reason, ts=now(UTC)))
     return nothing
 end
 
@@ -95,6 +127,7 @@ function resume_pool!(ctrl::ExecutionController, pool_id::String)
     prior = get(ctrl.halted_pools, pool_id, nothing)
     delete!(ctrl.halted_pools, pool_id)
     @warn "POOL RESUMED — logged human re-enable" pool_id=pool_id prior_reason=prior
+    ctrl.audit((event=:resume, scope=:pool, pool_id=pool_id, prior_reason=prior, ts=now(UTC)))
     return nothing
 end
 
@@ -199,6 +232,18 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
     if haskey(ctrl.halted_pools, o.pool_id)
         return OrderAck(:rejected, "", o.client_order_id,
                         "REJECTED: pool $(o.pool_id) halted — $(ctrl.halted_pools[o.pool_id])")
+    end
+
+    # REQ-DATA-003 — do not act on a stale feed. Transient gate: blocks emission while the
+    # pool's data is older than its threshold, and recovers automatically when fresh data is
+    # marked (unlike the sticky loss/manual halt). If data was never marked, treat as stale.
+    if haskey(ctrl.pool_max_staleness, o.pool_id)
+        age = now(UTC) - get(ctrl.pool_data_ts, o.pool_id, DateTime(0))
+        if age > ctrl.pool_max_staleness[o.pool_id]
+            return OrderAck(:rejected, "", o.client_order_id,
+                            "REJECTED (REQ-DATA-003): pool $(o.pool_id) feed stale — " *
+                            "age $(age) > $(ctrl.pool_max_staleness[o.pool_id])")
+        end
     end
 
     # REQ-RISK-003 — per-pool daily gross-notional budget, enforced at the gate before emission.

@@ -75,10 +75,13 @@ fleet machine — not a repo clone. The governed controller above is built once.
 
 ## P1b — remaining live-capital invariants
 
-- [ ] **REQ-DATA-003 (staleness halt)** — Execution path halts (not warns) on data older
-      than a per-venue threshold. `module_1` has staleness *detection*; wire it to a halt.
-- [ ] **REQ-GOV-002 (kill switch)** — bounded-time guarantee + write halt events to the
-      `module_8_governance` audit log (kill switch itself is enforced; step 5 completes it).
+- [x] **Step 5 — REQ-GOV-002 finish + REQ-DATA-003.** GOV-002: bounded-time documented
+      (flag checked synchronously; ≤1 in-flight order via the venue lock); all
+      halt/resume events (global + per-pool) go to an `audit` sink (`set_audit_sink!`),
+      which the runner wires to the module_8 governance log. DATA-003: `submit_governed!`
+      blocks emission for a pool whose feed exceeds `set_pool_staleness!` (transient gate,
+      auto-recovers on `mark_data_fresh!`; never-marked = stale). Both `partial` (enforced;
+      module_1/module_8 wiring is integration; tests = step 6).
 
 ## P2 — cover the untested modules 9–13 (the coverage cliff)
 
