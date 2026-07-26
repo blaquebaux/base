@@ -61,7 +61,9 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
         isempty(o.account) || (jib.account = o.account)
         (contract, jib)
     end
-    return OrderAck(status, status === :accepted ? oid : "", o.client_order_id, err)
+    # G1: keep the order id for :accepted AND :uncertain (an uncertain order may be live and
+    # may fill — its lineage must be recordable). Blank only on :rejected (never sent).
+    return OrderAck(status, status === :rejected ? "" : oid, o.client_order_id, err)
 end
 
 function cancel!(v::IBKRVenue, venue_order_id::String)::Bool

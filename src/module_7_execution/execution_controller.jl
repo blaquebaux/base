@@ -60,15 +60,23 @@ end
 # ── Idempotency rehydration (REQ-EXEC-002, cross-restart) ──────────────────────
 
 """
-    rehydrate!(ctrl, prior::Dict{String,OrderAck})
+    rehydrate!(ctrl; seen, lineage)
 
-Restore the seen-set on startup so a crash-restart does not re-submit orders that
-already went out. STEP 2 provides the hook; STEP 3 populates `prior` from the
-persisted execution ledger (client_order_id ⇔ orderRef ⇔ fill lineage).
+Restore controller state on startup so a crash-restart neither re-submits orders that
+already went out (`seen`, REQ-EXEC-002) nor loses the ability to tag post-restart fills
+for pre-restart orders (`lineage`, REQ-AUDIT-001 — G2).
+
+The caller reconstructs these from the persisted execution ledger: `lineage` (order_id →
+signal/regime/solve) is fully derivable from the ledger's lineage columns. Full `seen`
+reconstruction additionally needs the broker's open-orders matched by `orderRef`
+(client_order_id) — a follow-on to this hook.
 """
-function rehydrate!(ctrl::ExecutionController, prior::Dict{String,OrderAck})
-    merge!(ctrl.seen, prior)
-    @info "rehydrated idempotency set" n=length(prior)
+function rehydrate!(ctrl::ExecutionController;
+                    seen::Dict{String,OrderAck}   = Dict{String,OrderAck}(),
+                    lineage::Dict{String,NamedTuple} = Dict{String,NamedTuple}())
+    merge!(ctrl.seen, seen)
+    merge!(ctrl.lineage, lineage)
+    @info "rehydrated controller state" seen=length(seen) lineage=length(lineage)
     return nothing
 end
 
@@ -146,27 +154,31 @@ function apply_fill!(ctrl::ExecutionController, symbol::String, signed_qty::Floa
 end
 
 """
-    process_fills!(ctrl) -> Vector{NamedTuple}
+    process_fills!(ctrl; record=(_->nothing)) -> Vector{NamedTuple}
 
-Drain confirmed fills from the venue, update expected positions from them (F1), and
-return each fill tagged with its decision lineage (looked up by venue order id). The
-caller records these to the execution ledger — and because `FillRecord` requires
-non-empty lineage (REQ-AUDIT-001), a fill whose lineage is missing here (logged as an
-error) cannot be silently recorded.
+Drain confirmed fills from the venue, tag each with its decision lineage (looked up by
+venue order id, REQ-AUDIT-001), persist it via `record`, and only then update expected
+positions from it (F1). Returns the successfully-processed fills.
+
+G3 — persistence and the expected-position update are coupled here and ordered
+**record-then-apply**: if `record` throws for a fill, `expected` is NOT updated for it, so
+the fill surfaces as a broker-vs-expected divergence in `reconcile!` (a halt) rather than
+being silently lost. A per-fill failure does not abort the rest of the batch. The default
+no-op `record` is for reconcile-only / test use; the daily runner passes a real recorder
+that builds a `FillRecord` (which itself rejects missing lineage) and calls `record_fill`.
 """
-function process_fills!(ctrl::ExecutionController)::Vector{NamedTuple}
-    enriched = NamedTuple[]
+function process_fills!(ctrl::ExecutionController; record::Function = (_) -> nothing)::Vector{NamedTuple}
+    processed = NamedTuple[]
     for f in drain_fills(ctrl.venue)
         # IBKR execution.side is "BOT"/"SLD"; accept BUY/SELL too for other venues.
         is_buy = f.side in ("BOT", "BUY", "buy")
         signed = (is_buy ? 1.0 : -1.0) * abs(float(f.shares))
-        apply_fill!(ctrl, f.symbol, signed)
 
         lin = get(ctrl.lineage, string(f.order_id), nothing)
         if lin === nothing
             @error "Fill has no known lineage — cannot be recorded (REQ-AUDIT-001)" order_id=f.order_id symbol=f.symbol
         end
-        push!(enriched, (
+        e = (
             symbol          = f.symbol,
             order_id        = string(f.order_id),
             signed_qty      = signed,
@@ -176,9 +188,16 @@ function process_fills!(ctrl::ExecutionController)::Vector{NamedTuple}
             regime          = lin === nothing ? nothing : lin.regime,
             solve_id        = lin === nothing ? nothing : lin.solve_id,
             client_order_id = lin === nothing ? nothing : lin.client_order_id,
-        ))
+        )
+        try
+            record(e)                              # persist first
+            apply_fill!(ctrl, f.symbol, signed)    # then trust expected
+            push!(processed, e)
+        catch err
+            @error "fill record failed — expected NOT updated; reconcile! will surface it" order_id=e.order_id exception=err
+        end
     end
-    return enriched
+    return processed
 end
 
 # ── Reconciliation (REQ-EXEC-003) ──────────────────────────────────────────────
