@@ -1,26 +1,25 @@
 # ============================================================================
 # EXECUTION CONTROLLER — venue-agnostic governed order path
 # ----------------------------------------------------------------------------
-# Order-path invariants live here, built ONCE against the ExecutionVenue
-# interface so every venue (IBKR now, Alpaca later) inherits them:
+# Order-path invariants live here, built ONCE against the ExecutionVenue interface
+# so every venue (IBKR now, Alpaca later) inherits them: EXEC-001/002/003,
+# AUDIT-001/002, RISK-003/004, DATA-003, GOV-002.
 #
-#   REQ-EXEC-001  serial submission per pool      (venue-side lock)
-#   REQ-EXEC-002  idempotency across reconnects   [STEP 2 — in-process; cross-restart pending ledger]
-#   REQ-EXEC-003  position reconciliation         [STEP 2 — expected-vs-broker + halt]
-#   REQ-AUDIT-001 fill lineage                     [STEP 3 — FillRecord fields]
-#   REQ-AUDIT-002 reject on incomplete lineage    [STEP 3]
-#   REQ-RISK-003  per-pool budget gate            [STEP 4]
-#   REQ-RISK-004  per-pool daily loss halt        [STEP 4]
-#   REQ-GOV-002   kill switch                      [enforced; bounded-time+audit in STEP 5]
+# Concurrency (I2): the controller is safe for concurrent pool coroutines. `_lock`
+# guards all shared state. It is NEVER held across I/O — venue submit!/positions,
+# the ledger `record` callback, or the audit sink — so the kill switch (halt!) can
+# never be blocked by an in-flight order (preserves GOV-002 bounded time). Submission
+# uses reserve→submit→finalize: the budget is reserved under the lock, the network
+# submit runs lock-free, then the reservation is confirmed or rolled back under the lock.
 #
-# Live-capital use is blocked until every [STEP n] gap is closed (HONEST-ASSESSMENT.md).
+# Live-capital use is blocked until the tests (step 6) pass + integration wiring lands.
 # ============================================================================
 
 """
-    ExecutionController(venue; account="", recon_tolerance=0.0)
+    ExecutionController(venue; account="", recon_tolerance=1e-6, audit=(_->nothing))
 
 Single entry point the engine uses to place orders. All governed invariants are
-enforced here; the venue only translates to its broker API.
+enforced here; the venue only translates to its broker API. Concurrency-safe.
 """
 mutable struct ExecutionController{V<:ExecutionVenue}
     venue::V
@@ -31,23 +30,18 @@ mutable struct ExecutionController{V<:ExecutionVenue}
     lineage::Dict{String,NamedTuple}  # venue_order_id -> (signal_id, regime, solve_id, client_order_id)
     expected::Dict{String,Float64}    # symbol -> signed qty, driven from FILLS (REQ-EXEC-003)
     recon_tolerance::Float64          # shares; divergence beyond this halts
-    # ── per-pool state (step 4) ──
     pool_budgets::Dict{String,Float64}     # pool_id -> max daily gross notional (REQ-RISK-003)
-    pool_used::Dict{String,Float64}        # pool_id -> today's cumulative gross notional emitted
+    pool_used::Dict{String,Float64}        # pool_id -> today's reserved/emitted gross notional
     pool_loss_limit::Dict{String,Float64}  # pool_id -> max daily loss, positive (REQ-RISK-004)
     pool_daily_pnl::Dict{String,Float64}   # pool_id -> current daily PnL (engine-supplied)
     halted_pools::Dict{String,String}      # pool_id -> halt reason (per-pool halt)
     symbol_pool::Dict{String,String}       # symbol -> pool_id (for per-pool reconcile halt)
-    # ── step 5 ──
     audit::Function                        # halt/resume audit sink (REQ-GOV-002)
     pool_max_staleness::Dict{String,Millisecond}  # pool_id -> max feed age (REQ-DATA-003)
     pool_data_ts::Dict{String,DateTime}    # pool_id -> last time the pool's feed was fresh
+    _lock::ReentrantLock                   # guards all of the above (I2)
 end
 
-# recon_tolerance default is a small epsilon (F4): catches any ≥1-share divergence while
-# ignoring float-accumulation noise. Raise it for a deliberate business tolerance.
-# `audit` receives halt/resume events (REQ-GOV-002); the runner wires it to the
-# module_8 governance audit log. Default is a no-op (events still hit the logger).
 ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=1e-6,
                     audit::Function = (_) -> nothing) =
     ExecutionController(v, false, nothing, account,
@@ -56,64 +50,80 @@ ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real
                         Dict{String,Float64}(), Dict{String,Float64}(),
                         Dict{String,Float64}(), Dict{String,Float64}(),
                         Dict{String,String}(), Dict{String,String}(),
-                        audit, Dict{String,Millisecond}(), Dict{String,DateTime}())
+                        audit, Dict{String,Millisecond}(), Dict{String,DateTime}(),
+                        ReentrantLock())
 
-"Replace the halt/resume audit sink (REQ-GOV-002)."
-set_audit_sink!(ctrl::ExecutionController, f::Function) = (ctrl.audit = f; nothing)
+# ── Audit (I1: best-effort — a failing sink must never compromise a halt) ───────
 
-# ── Per-pool configuration (step 4) ────────────────────────────────────────────
+function _audit(ctrl::ExecutionController, event)
+    try
+        ctrl.audit(event)
+    catch e
+        @error "audit sink threw — halt/resume state still applied (I1)" event=event exception=e
+    end
+    return nothing
+end
+
+# ── Configuration (all short, lock-guarded) ────────────────────────────────────
+
+set_audit_sink!(ctrl::ExecutionController, f::Function) =
+    (lock(() -> (ctrl.audit = f), ctrl._lock); nothing)
 
 "Set a pool's max daily gross-notional budget (REQ-RISK-003)."
 set_pool_budget!(ctrl::ExecutionController, pool_id::String, cap::Real) =
-    (ctrl.pool_budgets[pool_id] = float(cap); nothing)
+    (lock(() -> (ctrl.pool_budgets[pool_id] = float(cap)), ctrl._lock); nothing)
 
 "Set a pool's max daily loss (positive number; REQ-RISK-004)."
 set_pool_loss_limit!(ctrl::ExecutionController, pool_id::String, limit::Real) =
-    (ctrl.pool_loss_limit[pool_id] = abs(float(limit)); nothing)
+    (lock(() -> (ctrl.pool_loss_limit[pool_id] = abs(float(limit))), ctrl._lock); nothing)
 
 "Set a pool's maximum acceptable feed staleness (REQ-DATA-003). `max_age` is any Period."
 set_pool_staleness!(ctrl::ExecutionController, pool_id::String, max_age::Period) =
-    (ctrl.pool_max_staleness[pool_id] = convert(Millisecond, max_age); nothing)
+    (lock(() -> (ctrl.pool_max_staleness[pool_id] = convert(Millisecond, max_age)), ctrl._lock); nothing)
 
-"Record that a pool's market-data feed is fresh as of `ts` (REQ-DATA-003). The engine calls
-this whenever module_1 delivers non-stale data for the pool."
+"Record that a pool's market-data feed is fresh as of `ts` (REQ-DATA-003)."
 mark_data_fresh!(ctrl::ExecutionController, pool_id::String; ts::DateTime = now(UTC)) =
-    (ctrl.pool_data_ts[pool_id] = ts; nothing)
+    (lock(() -> (ctrl.pool_data_ts[pool_id] = ts), ctrl._lock); nothing)
 
 # ── Kill switch (REQ-GOV-002) ──────────────────────────────────────────────────
 
 """
     halt!(ctrl, reason)  — REQ-GOV-002 kill switch
 
-Stops all new emission. **Bounded time:** this sets a flag that `submit_governed!` checks
-synchronously, and submissions are serialized by the venue lock — so once `halt!` returns,
-at most one already-in-flight order can still complete and no new order starts. The halt
-event is sent to the audit sink (the runner wires it to the module_8 governance log).
+Stops all new emission. **Bounded time:** sets a flag that `submit_governed!` checks
+under the lock, and the lock is never held across I/O — so `halt!` cannot be blocked by an
+in-flight order; at most one already-submitted order completes, then no new order starts.
+The halt event is sent (best-effort) to the audit sink outside the lock.
 """
 function halt!(ctrl::ExecutionController, reason::String)
-    ctrl.halted = true
-    ctrl.halt_reason = reason
+    lock(ctrl._lock) do
+        ctrl.halted = true
+        ctrl.halt_reason = reason
+    end
     @warn "EXECUTION HALTED (REQ-GOV-002)" reason=reason
-    ctrl.audit((event=:halt, scope=:global, reason=reason, ts=now(UTC)))
+    _audit(ctrl, (event=:halt, scope=:global, reason=reason, ts=now(UTC)))
     return nothing
 end
 
 function resume!(ctrl::ExecutionController)
-    prior = ctrl.halt_reason
+    prior = lock(ctrl._lock) do
+        p = ctrl.halt_reason
+        ctrl.halted = false
+        ctrl.halt_reason = nothing
+        p
+    end
     @warn "EXECUTION RESUMED — logged human re-enable" prior_reason=prior
-    ctrl.halted = false
-    ctrl.halt_reason = nothing
-    ctrl.audit((event=:resume, scope=:global, prior_reason=prior, ts=now(UTC)))
+    _audit(ctrl, (event=:resume, scope=:global, prior_reason=prior, ts=now(UTC)))
     return nothing
 end
 
 # ── Per-pool halt & daily loss limit (REQ-RISK-004) ────────────────────────────
 
-"Halt new emission for one pool (per-pool kill). Reason is logged and recorded."
+"Halt new emission for one pool (per-pool kill). Reason is logged and audited."
 function halt_pool!(ctrl::ExecutionController, pool_id::String, reason::String)
-    ctrl.halted_pools[pool_id] = reason
+    lock(() -> (ctrl.halted_pools[pool_id] = reason), ctrl._lock)
     @warn "POOL HALTED" pool_id=pool_id reason=reason
-    ctrl.audit((event=:halt, scope=:pool, pool_id=pool_id, reason=reason, ts=now(UTC)))
+    _audit(ctrl, (event=:halt, scope=:pool, pool_id=pool_id, reason=reason, ts=now(UTC)))
     return nothing
 end
 
@@ -124,62 +134,66 @@ Explicit, logged human re-enable of a halted pool (REQ-RISK-004 requires the re-
 explicit — a new trading day does NOT auto-lift a loss halt).
 """
 function resume_pool!(ctrl::ExecutionController, pool_id::String)
-    prior = get(ctrl.halted_pools, pool_id, nothing)
-    delete!(ctrl.halted_pools, pool_id)
+    prior = lock(ctrl._lock) do
+        p = get(ctrl.halted_pools, pool_id, nothing)
+        delete!(ctrl.halted_pools, pool_id)
+        p
+    end
     @warn "POOL RESUMED — logged human re-enable" pool_id=pool_id prior_reason=prior
-    ctrl.audit((event=:resume, scope=:pool, pool_id=pool_id, prior_reason=prior, ts=now(UTC)))
+    _audit(ctrl, (event=:resume, scope=:pool, pool_id=pool_id, prior_reason=prior, ts=now(UTC)))
     return nothing
 end
 
 """
     update_pnl!(ctrl, pool_id, pnl)
 
-Feed a pool's current daily PnL (the engine computes it from marks/cost basis — the
-controller does not). If `pnl` breaches the pool's daily loss limit, the pool is halted
-until an explicit `resume_pool!` (REQ-RISK-004).
+Feed a pool's current daily PnL (the engine computes it from marks/cost basis). If `pnl`
+breaches the pool's daily loss limit, the pool is halted until an explicit `resume_pool!`
+(REQ-RISK-004).
 """
 function update_pnl!(ctrl::ExecutionController, pool_id::String, pnl::Real)
-    ctrl.pool_daily_pnl[pool_id] = float(pnl)
-    if haskey(ctrl.pool_loss_limit, pool_id) && pnl <= -ctrl.pool_loss_limit[pool_id]
-        halt_pool!(ctrl, pool_id,
-                   "daily loss limit breached (REQ-RISK-004): pnl=$(pnl) limit=-$(ctrl.pool_loss_limit[pool_id])")
+    breach, lim = lock(ctrl._lock) do
+        ctrl.pool_daily_pnl[pool_id] = float(pnl)
+        l = get(ctrl.pool_loss_limit, pool_id, nothing)
+        (l !== nothing && pnl <= -l, l)
     end
+    breach && halt_pool!(ctrl, pool_id,
+        "daily loss limit breached (REQ-RISK-004): pnl=$(pnl) limit=-$(lim)")
     return nothing
 end
 
 """
     reset_daily!(ctrl)
 
-Start-of-day reset: clear per-pool daily turnover (`pool_used`) and PnL counters. Does
-NOT lift halts — a loss-halted or manually-halted pool stays halted until `resume_pool!`
-(REQ-RISK-004: re-enable must be explicit).
+Start-of-day reset: clear per-pool daily turnover (`pool_used`) and PnL counters. Does NOT
+lift halts — a loss-halted or manually-halted pool stays halted until `resume_pool!`.
 """
 function reset_daily!(ctrl::ExecutionController)
-    empty!(ctrl.pool_used)
-    empty!(ctrl.pool_daily_pnl)
+    lock(ctrl._lock) do
+        empty!(ctrl.pool_used)
+        empty!(ctrl.pool_daily_pnl)
+    end
     @info "daily counters reset (halts NOT lifted — require explicit resume_pool!)"
     return nothing
 end
 
-# ── Idempotency rehydration (REQ-EXEC-002, cross-restart) ──────────────────────
+# ── Idempotency / lineage rehydration (REQ-EXEC-002 / AUDIT-001 cross-restart) ──
 
 """
     rehydrate!(ctrl; seen, lineage)
 
 Restore controller state on startup so a crash-restart neither re-submits orders that
-already went out (`seen`, REQ-EXEC-002) nor loses the ability to tag post-restart fills
-for pre-restart orders (`lineage`, REQ-AUDIT-001 — G2).
-
-The caller reconstructs these from the persisted execution ledger: `lineage` (order_id →
-signal/regime/solve) is fully derivable from the ledger's lineage columns. Full `seen`
-reconstruction additionally needs the broker's open-orders matched by `orderRef`
-(client_order_id) — a follow-on to this hook.
+already went out (`seen`) nor loses the ability to tag post-restart fills for pre-restart
+orders (`lineage`, G2). The caller reconstructs both from the persisted ledger; full `seen`
+reconstruction also needs broker open-orders by `orderRef` (a follow-on).
 """
 function rehydrate!(ctrl::ExecutionController;
                     seen::Dict{String,OrderAck}   = Dict{String,OrderAck}(),
                     lineage::Dict{String,NamedTuple} = Dict{String,NamedTuple}())
-    merge!(ctrl.seen, seen)
-    merge!(ctrl.lineage, lineage)
+    lock(ctrl._lock) do
+        merge!(ctrl.seen, seen)
+        merge!(ctrl.lineage, lineage)
+    end
     @info "rehydrated controller state" seen=length(seen) lineage=length(lineage)
     return nothing
 end
@@ -192,95 +206,92 @@ _gate_price(o::VenueOrder) = o.limit_price !== nothing ? o.limit_price : o.ref_p
 """
     submit_governed!(ctrl, order) -> OrderAck
 
-The single governed submission path. Checks run in this order:
-idempotency → global kill switch → lineage (AUDIT-002) → per-pool halt → per-pool
-budget (RISK-003) → submit. Idempotency is first so a replay of an already-sent order
-returns its prior ack even while halted (it is not a new emission).
+The single governed submission path. Checks (idempotency → global kill → lineage
+AUDIT-002 → disjoint-symbol → per-pool halt → staleness DATA-003 → budget RISK-003) and the
+budget reservation run atomically under the lock; the network submit runs lock-free; then
+the reservation is confirmed (accepted/uncertain) or rolled back (rejected) under the lock.
 """
 function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
-    # REQ-EXEC-002 — idempotency first: a replay returns the prior ack, never re-submits.
-    if haskey(ctrl.seen, o.client_order_id)
-        @warn "Idempotent replay — returning prior ack, NOT re-submitting (REQ-EXEC-002)" client_order_id=o.client_order_id
-        return ctrl.seen[o.client_order_id]
-    end
+    # Phase 1 — checks + reservation, atomic under the lock (NO I/O).
+    # Returns (ack, _) to short-circuit, or (nothing, notional) to proceed.
+    decision = lock(ctrl._lock) do
+        # REQ-EXEC-002 — idempotency first: a replay returns its prior ack, never re-submits.
+        haskey(ctrl.seen, o.client_order_id) && return (ctrl.seen[o.client_order_id], 0.0)
 
-    # REQ-GOV-002 — global kill switch.
-    if ctrl.halted
-        return OrderAck(:rejected, "", o.client_order_id,
-                        "HALTED (REQ-GOV-002): $(ctrl.halt_reason)")
-    end
+        # REQ-GOV-002 — global kill switch.
+        ctrl.halted && return (OrderAck(:rejected, "", o.client_order_id,
+                                        "HALTED (REQ-GOV-002): $(ctrl.halt_reason)"), 0.0)
 
-    # REQ-AUDIT-002 — lineage is a precondition of emission; reject if incomplete.
-    missing_lineage = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
-                                          ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
-    if !isempty(missing_lineage)
-        return OrderAck(:rejected, "", o.client_order_id,
-                        "REJECTED (REQ-AUDIT-002): missing lineage " * join(missing_lineage, ", "))
-    end
+        # REQ-AUDIT-002 — lineage is a precondition of emission.
+        ml = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
+                                 ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
+        isempty(ml) || return (OrderAck(:rejected, "", o.client_order_id,
+                                        "REJECTED (REQ-AUDIT-002): missing lineage " * join(ml, ", ")), 0.0)
 
-    # H1 — pool-disjoint symbols. `expected`/`symbol_pool` track per symbol, so a symbol must
-    # belong to exactly one pool or per-pool reconcile attribution breaks. Enforce it rather
-    # than silently mis-attribute. (If cross-pool symbols are ever needed, key state by
-    # (pool, symbol) instead.)
-    if haskey(ctrl.symbol_pool, o.symbol) && ctrl.symbol_pool[o.symbol] != o.pool_id
-        return OrderAck(:rejected, "", o.client_order_id,
-                        "REJECTED: symbol $(o.symbol) already assigned to pool " *
-                        "$(ctrl.symbol_pool[o.symbol]); cross-pool symbol reuse is unsupported.")
-    end
+        # H1 — pool-disjoint symbols (check-and-reserve atomically).
+        (haskey(ctrl.symbol_pool, o.symbol) && ctrl.symbol_pool[o.symbol] != o.pool_id) &&
+            return (OrderAck(:rejected, "", o.client_order_id,
+                             "REJECTED: symbol $(o.symbol) already assigned to pool " *
+                             "$(ctrl.symbol_pool[o.symbol]); cross-pool symbol reuse is unsupported."), 0.0)
 
-    # REQ-RISK-004 (enforcement) — per-pool halt (loss-limit breach or manual pool halt).
-    if haskey(ctrl.halted_pools, o.pool_id)
-        return OrderAck(:rejected, "", o.client_order_id,
-                        "REJECTED: pool $(o.pool_id) halted — $(ctrl.halted_pools[o.pool_id])")
-    end
+        # REQ-RISK-004 — per-pool halt.
+        haskey(ctrl.halted_pools, o.pool_id) &&
+            return (OrderAck(:rejected, "", o.client_order_id,
+                             "REJECTED: pool $(o.pool_id) halted — $(ctrl.halted_pools[o.pool_id])"), 0.0)
 
-    # REQ-DATA-003 — do not act on a stale feed. Transient gate: blocks emission while the
-    # pool's data is older than its threshold, and recovers automatically when fresh data is
-    # marked (unlike the sticky loss/manual halt). If data was never marked, treat as stale.
-    if haskey(ctrl.pool_max_staleness, o.pool_id)
-        age = now(UTC) - get(ctrl.pool_data_ts, o.pool_id, DateTime(0))
-        if age > ctrl.pool_max_staleness[o.pool_id]
-            return OrderAck(:rejected, "", o.client_order_id,
-                            "REJECTED (REQ-DATA-003): pool $(o.pool_id) feed stale — " *
-                            "age $(age) > $(ctrl.pool_max_staleness[o.pool_id])")
+        # REQ-DATA-003 — stale-feed gate (transient; recovers on mark_data_fresh!).
+        if haskey(ctrl.pool_max_staleness, o.pool_id)
+            age = now(UTC) - get(ctrl.pool_data_ts, o.pool_id, DateTime(0))
+            age > ctrl.pool_max_staleness[o.pool_id] &&
+                return (OrderAck(:rejected, "", o.client_order_id,
+                                 "REJECTED (REQ-DATA-003): pool $(o.pool_id) feed stale — " *
+                                 "age $(age) > $(ctrl.pool_max_staleness[o.pool_id])"), 0.0)
         end
+
+        # REQ-RISK-003 — per-pool daily gross-notional budget.
+        notional = 0.0
+        if haskey(ctrl.pool_budgets, o.pool_id)
+            price = _gate_price(o)
+            price === nothing &&
+                return (OrderAck(:rejected, "", o.client_order_id,
+                                 "REJECTED (REQ-RISK-003): pool $(o.pool_id) has a budget but the order " *
+                                 "has no price to size against (set limit_price or ref_price)"), 0.0)
+            notional = price * o.quantity
+            used = get(ctrl.pool_used, o.pool_id, 0.0)
+            used + notional > ctrl.pool_budgets[o.pool_id] &&
+                return (OrderAck(:rejected, "", o.client_order_id,
+                                 "REJECTED (REQ-RISK-003): pool $(o.pool_id) budget breach — " *
+                                 "used $(used) + $(notional) > $(ctrl.pool_budgets[o.pool_id])"), 0.0)
+        end
+
+        # Reserve: claim the symbol for its pool and reserve the budget so concurrent
+        # submissions can't over-commit. Rolled back below if the venue rejects.
+        ctrl.symbol_pool[o.symbol] = o.pool_id
+        ctrl.pool_used[o.pool_id]  = get(ctrl.pool_used, o.pool_id, 0.0) + notional
+        return (nothing, notional)
     end
 
-    # REQ-RISK-003 — per-pool daily gross-notional budget, enforced at the gate before emission.
-    notional = 0.0
-    if haskey(ctrl.pool_budgets, o.pool_id)
-        price = _gate_price(o)
-        if price === nothing
-            return OrderAck(:rejected, "", o.client_order_id,
-                            "REJECTED (REQ-RISK-003): pool $(o.pool_id) has a budget but the order " *
-                            "has no price to size against (set limit_price or ref_price)")
-        end
-        notional = price * o.quantity
-        used = get(ctrl.pool_used, o.pool_id, 0.0)
-        if used + notional > ctrl.pool_budgets[o.pool_id]
-            return OrderAck(:rejected, "", o.client_order_id,
-                            "REJECTED (REQ-RISK-003): pool $(o.pool_id) budget breach — " *
-                            "used $(used) + $(notional) > $(ctrl.pool_budgets[o.pool_id])")
-        end
-    end
+    decision[1] !== nothing && return decision[1]::OrderAck
+    notional = decision[2]
 
+    # Phase 2 — submit (network I/O; NO controller lock, so the kill switch stays responsive).
     ack = submit!(ctrl.venue, o)
 
-    # F2 — lock the client_order_id on :accepted OR :uncertain (may be live). Only a clean
-    # :rejected leaves the id free to retry.
-    if islocked_id(ack)
-        ctrl.seen[o.client_order_id] = ack
-        ctrl.symbol_pool[o.symbol]   = o.pool_id            # for per-pool reconcile halt
-        ctrl.pool_used[o.pool_id]    = get(ctrl.pool_used, o.pool_id, 0.0) + notional  # RISK-003 turnover
-        # Record lineage keyed by venue order id so incoming fills can be tagged (REQ-AUDIT-001).
-        # Lineage is guaranteed present by the AUDIT-002 gate; oid present for accepted+uncertain (G1).
-        if !isempty(ack.venue_order_id)
-            ctrl.lineage[ack.venue_order_id] = (
-                signal_id       = o.signal_id,
-                regime          = o.regime,
-                solve_id        = o.solve_id,
-                client_order_id = o.client_order_id,
-            )
+    # Phase 3 — confirm or roll back the reservation, under the lock.
+    lock(ctrl._lock) do
+        if islocked_id(ack)   # :accepted or :uncertain (may be live) — F2
+            ctrl.seen[o.client_order_id] = ack
+            if !isempty(ack.venue_order_id)   # oid present for accepted+uncertain (G1)
+                ctrl.lineage[ack.venue_order_id] = (
+                    signal_id       = o.signal_id,
+                    regime          = o.regime,
+                    solve_id        = o.solve_id,
+                    client_order_id = o.client_order_id,
+                )
+            end
+        else
+            # Clean :rejected by the venue — release the budget reservation.
+            ctrl.pool_used[o.pool_id] = get(ctrl.pool_used, o.pool_id, 0.0) - notional
         end
     end
     return ack
@@ -291,40 +302,35 @@ end
 """
     apply_fill!(ctrl, symbol, signed_qty)
 
-Update expected position by an actual FILLED quantity (signed). This is the only
-thing that moves `expected` — never submitted order quantity — so reconciliation
-compares fills-to-fills against the broker (fixes F1).
+Update expected position by an actual FILLED quantity (signed). The only thing that moves
+`expected` — never submitted order quantity — so reconciliation compares fills-to-fills.
 """
 function apply_fill!(ctrl::ExecutionController, symbol::String, signed_qty::Float64)
-    ctrl.expected[symbol] = get(ctrl.expected, symbol, 0.0) + signed_qty
+    lock(ctrl._lock) do
+        ctrl.expected[symbol] = get(ctrl.expected, symbol, 0.0) + signed_qty
+    end
     return nothing
 end
 
 """
     process_fills!(ctrl; record=(_->nothing)) -> Vector{NamedTuple}
 
-Drain confirmed fills from the venue, tag each with its decision lineage (looked up by
-venue order id, REQ-AUDIT-001), persist it via `record`, and only then update expected
-positions from it (F1). Returns the successfully-processed fills.
+Drain confirmed fills from the venue, tag each with its decision lineage (REQ-AUDIT-001),
+persist it via `record`, then update expected from it (F1). Returns the processed fills.
 
-G3 — persistence and the expected-position update are coupled here and ordered
-**record-then-apply**: if `record` throws for a fill, `expected` is NOT updated for it, so
-the fill surfaces as a broker-vs-expected divergence in `reconcile!` (a halt) rather than
-being silently lost. A per-fill failure does not abort the rest of the batch. The default
-no-op `record` is for reconcile-only / test use; the daily runner passes a real recorder
-that builds a `FillRecord` (which itself rejects missing lineage) and calls `record_fill`.
+G3 — ordered record-then-apply: if `record` throws for a fill, `expected` is NOT updated,
+so the fill surfaces as a `reconcile!` divergence rather than being silently lost; a
+per-fill failure does not abort the batch. `record` runs outside the lock (I2). The default
+no-op `record` is for reconcile-only / test use.
 """
 function process_fills!(ctrl::ExecutionController; record::Function = (_) -> nothing)::Vector{NamedTuple}
     processed = NamedTuple[]
-    for f in drain_fills(ctrl.venue)
-        # IBKR execution.side is "BOT"/"SLD"; accept BUY/SELL too for other venues.
-        is_buy = f.side in ("BOT", "BUY", "buy")
+    for f in drain_fills(ctrl.venue)   # venue drains under its own lock; no controller lock here
+        is_buy = f.side in ("BOT", "BUY", "buy")   # IBKR side is "BOT"/"SLD"
         signed = (is_buy ? 1.0 : -1.0) * abs(float(f.shares))
 
-        lin = get(ctrl.lineage, string(f.order_id), nothing)
-        if lin === nothing
-            @error "Fill has no known lineage — cannot be recorded (REQ-AUDIT-001)" order_id=f.order_id symbol=f.symbol
-        end
+        lin = lock(() -> get(ctrl.lineage, string(f.order_id), nothing), ctrl._lock)
+        lin === nothing && @error "Fill has no known lineage — cannot be recorded (REQ-AUDIT-001)" order_id=f.order_id symbol=f.symbol
         e = (
             symbol          = f.symbol,
             order_id        = string(f.order_id),
@@ -337,8 +343,8 @@ function process_fills!(ctrl::ExecutionController; record::Function = (_) -> not
             client_order_id = lin === nothing ? nothing : lin.client_order_id,
         )
         try
-            record(e)                              # persist first
-            apply_fill!(ctrl, f.symbol, signed)    # then trust expected
+            record(e)                              # persist first (outside the lock — I/O)
+            apply_fill!(ctrl, f.symbol, signed)    # then trust expected (self-locks)
             push!(processed, e)
         catch err
             @error "fill record failed — expected NOT updated; reconcile! will surface it" order_id=e.order_id exception=err
@@ -352,55 +358,50 @@ end
 """
     reconcile!(ctrl) -> Bool
 
-Compare the controller's (fill-driven) expected positions against broker-reported
-positions. On divergence beyond `recon_tolerance`, HALT the affected pool(s) and return
-false; else true. Call `process_fills!` first so `expected` reflects the latest fills.
+Compare the controller's (fill-driven) expected positions against broker-reported positions.
+On divergence beyond `recon_tolerance`, HALT the affected pool(s) and return false; else true.
+A diverging symbol halts its own pool (via `symbol_pool`); an unattributable symbol triggers
+a fail-safe controller-wide halt. Broker positions are fetched lock-free; the comparison runs
+under the lock; halts happen outside it.
 
-Per-pool (step 4): a diverging symbol halts its own pool (via `symbol_pool`); a diverging
-symbol with no known pool triggers a controller-wide halt (fail-safe — we can't scope it).
-
-⚠️ Ordering: `expected` only reflects fills that `process_fills!` has already applied. Call
-`process_fills!` immediately before `reconcile!` (or use `process_and_reconcile!`) — a stale
-`expected` will false-halt (fail-safe, but a nuisance).
+⚠️ Ordering: call `process_fills!` first (or use `process_and_reconcile!`) so `expected`
+reflects the latest fills — a stale `expected` will false-halt (fail-safe, but a nuisance).
 """
 function reconcile!(ctrl::ExecutionController)::Bool
-    broker = positions(ctrl.venue, ctrl.account)
-    by_pool = Dict{String,Vector{String}}()   # pool_id -> divergence messages
-    unscoped = String[]                        # symbols with no known pool
-    for s in union(keys(ctrl.expected), keys(broker))
-        exp = get(ctrl.expected, s, 0.0)
-        act = get(broker, s, 0.0)
-        if abs(exp - act) > ctrl.recon_tolerance
-            msg = "$s: expected $(exp), broker $(act)"
-            pool = get(ctrl.symbol_pool, s, nothing)
-            if pool === nothing
-                push!(unscoped, msg)
-            else
-                push!(get!(by_pool, pool, String[]), msg)
+    broker = positions(ctrl.venue, ctrl.account)   # I/O — no controller lock
+
+    by_pool, unscoped, nchecked = lock(ctrl._lock) do
+        bp = Dict{String,Vector{String}}()
+        un = String[]
+        allkeys = union(keys(ctrl.expected), keys(broker))
+        for s in allkeys
+            exp = get(ctrl.expected, s, 0.0)
+            act = get(broker, s, 0.0)
+            if abs(exp - act) > ctrl.recon_tolerance
+                msg  = "$s: expected $(exp), broker $(act)"
+                pool = get(ctrl.symbol_pool, s, nothing)
+                pool === nothing ? push!(un, msg) : push!(get!(bp, pool, String[]), msg)
             end
         end
+        (bp, un, length(allkeys))
     end
 
     if isempty(by_pool) && isempty(unscoped)
-        @info "reconciliation ok" symbols_checked=length(union(keys(ctrl.expected), keys(broker)))
+        @info "reconciliation ok" symbols_checked=nchecked
         return true
     end
-
-    for (pool, msgs) in by_pool
+    for (pool, msgs) in by_pool   # halts happen outside the comparison lock
         halt_pool!(ctrl, pool, "position reconciliation divergence (REQ-EXEC-003): " * join(msgs, "; "))
     end
-    if !isempty(unscoped)
-        # Can't attribute to a pool → conservative controller-wide halt.
+    isempty(unscoped) ||
         halt!(ctrl, "unscoped reconciliation divergence (REQ-EXEC-003): " * join(unscoped, "; "))
-    end
     return false
 end
 
 """
     process_and_reconcile!(ctrl; record=(_->nothing)) -> Bool
 
-Convenience: apply the latest fills, then reconcile — the correct order (H3). Returns
-`reconcile!`'s result.
+Convenience: apply the latest fills, then reconcile — the correct order (H3).
 """
 function process_and_reconcile!(ctrl::ExecutionController; record::Function = (_) -> nothing)::Bool
     process_fills!(ctrl; record=record)

@@ -65,6 +65,16 @@ src/module_7_execution/
   against a paper Gateway.
 - **Asset scope:** `venues/ibkr.jl` translates US equities (STK/SMART/USD) to start;
   futures/options/non-US extend the same adapter when those pools go live.
+- **Concurrency (I2):** `ExecutionController` is safe for concurrent pool coroutines — a
+  `ReentrantLock` guards all shared state and is **never held across I/O** (venue
+  submit!/positions, ledger record, audit sink), so the kill switch can't be blocked by an
+  in-flight order (preserves GOV-002 bounded time). Submission is reserve→submit→finalize:
+  budget reserved under the lock, network submit lock-free, then confirm or roll back.
+- **Verified by execution:** the controller logic (all gates, idempotency, reserve/rollback,
+  per-pool halt/loss/staleness, reconcile, I1 audit robustness) passes a **30/30 mock-venue
+  smoke test** — the first runtime verification in this build. The IBKR *adapter* (Jib) and
+  the runner integration remain unverified until a paper Gateway (#4); the formal in-repo
+  test suite is step 6.
 
 ## Enforcement tiers
 **static** (build/CI rule) · **runtime** (assert/guard raises) · **test** (suite assertion) · **manual**

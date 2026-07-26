@@ -82,6 +82,12 @@ fleet machine — not a repo clone. The governed controller above is built once.
       blocks emission for a pool whose feed exceeds `set_pool_staleness!` (transient gate,
       auto-recovers on `mark_data_fresh!`; never-marked = stale). Both `partial` (enforced;
       module_1/module_8 wiring is integration; tests = step 6).
+- [x] **Step 5.5 — review findings I1/I2.** I1: audit sink is best-effort (`_audit`
+      try/catch) so a failing sink can't block a halt. I2: `ExecutionController` is now
+      concurrency-safe — a `ReentrantLock` guards all state, never held across I/O;
+      submission is reserve→submit→finalize so the kill switch stays responsive. **Verified
+      by a 30/30 mock-venue smoke test** (scratchpad `smoke_controller.jl`) — first runtime
+      verification; formalize into `test/` as step 6.
 
 ## P2 — cover the untested modules 9–13 (the coverage cliff)
 

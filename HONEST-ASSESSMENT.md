@@ -32,6 +32,12 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
   methodology, REQ-SIM-003 holds), but this assessment does not yet record actual vs.
   target Sharpe / MAE / hit-rate. **Do not cite performance figures externally until a
   dated run is recorded here.** ← open item, owner: C. Warrens.
+- **Execution controller logic is runtime-verified** [verified 2026-07-26] — the
+  venue-agnostic governed controller (all order-path gates, idempotency incl. the uncertain
+  path, budget reserve/rollback, per-pool loss/staleness halts, per-pool reconciliation,
+  concurrency lock, audit-sink robustness) passes a 30/30 mock-venue smoke test. This is
+  logic-level verification only: the IBKR adapter (Jib TWS calls) and end-to-end
+  integration remain [unknown] until run against a paper Gateway.
 - **CV methodology is sound** [verified] — purged K-Fold prevents the fold-leakage that
   inflates most naive backtests. This is a credibility asset; it is separately true from
   the runtime look-ahead question (REQ-SIM-001), which is **not** protected — a backtest
@@ -108,6 +114,16 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
 - ✓ every module is claimed or acknowledged
 - ✓ all cited tests exist
 - ℹ️ test files not yet cited by a REQ:test_module_2.jl test_module_3.jl 
+- ℹ️ features not in matrix (informational):REQ-FEAT-001 REQ-FEAT-002 
+- ✓ matrix fresh (0d)
+
+### spec-audit — 2026-07-26
+
+- invariants defined: 18 · in matrix: 18 · modules: 13 · tests: 15
+- ✓ every invariant is in the matrix
+- ✓ every module is claimed or acknowledged
+- ✓ all cited tests exist
+- ℹ️ test files not yet cited by a REQ:test_module_2.jl test_module_3.jl test_module_7.jl 
 - ℹ️ features not in matrix (informational):REQ-FEAT-001 REQ-FEAT-002 
 - ✓ matrix fresh (0d)
 
