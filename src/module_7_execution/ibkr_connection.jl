@@ -1,9 +1,10 @@
 # ============================================================================
 # IBKR CONNECTION — Jib.jl (InteractiveBrokers Julia TWS Client)
-# Replaces TCP scaffold with real Jib.jl API calls.
+# TWS live port: 7496 | Paper: 7497 | IB Gateway live: 4001 | Paper: 4002
 # Jib repo: https://github.com/lbilli/Jib.jl
-# TWS live port: 7496  |  Paper port: 7497
-# IB Gateway live: 4001 | Paper: 4002
+# ----------------------------------------------------------------------------
+# Instance-based: each IBKRConnection is owned by its IBKRVenue (no global
+# singleton), so multiple venues/accounts can coexist in one process.
 # ============================================================================
 
 using Sockets, Dates, TimeZones, Logging
@@ -23,7 +24,7 @@ end
 
 function IBKRConfig(;
     host::String              = get(ENV, "IBKR_HOST", "127.0.0.1"),
-    port::Int                 = parse(Int, get(ENV, "IBKR_PORT", "7497")),
+    port::Int                 = parse(Int, get(ENV, "IBKR_PORT", "7497")),  # paper by default
     client_id::Int            = 1,
     account::String           = get(ENV, "IBKR_ACCOUNT", ""),
     reconnect_attempts::Int   = 3,
@@ -40,40 +41,28 @@ mutable struct IBKRConnection
     wrapper::Union{Any, Nothing}           # Jib wrapper (callback dispatch)
     reader::Union{Task, Nothing}           # Jib reader task
     is_connected::Bool
-    next_order_id::Int
+    next_order_id::Int                     # IBKR order ids ONLY (from nextValidId)
+    next_req_id::Int                       # market-data / query request ids (separate space)
     positions::Dict{String, Float64}       # symbol → net position (updated by callbacks)
     pending_fills::Channel{NamedTuple}     # fills arrive asynchronously
     _lock::ReentrantLock
 end
 
 function IBKRConnection(config::IBKRConfig = IBKRConfig())
-    IBKRConnection(config, nothing, nothing, nothing, false, 1,
+    IBKRConnection(config, nothing, nothing, nothing, false,
+                   1,          # next_order_id (overwritten by nextValidId callback)
+                   1_000_000,  # next_req_id — high base, disjoint from order-id space
                    Dict{String,Float64}(), Channel{NamedTuple}(256), ReentrantLock())
-end
-
-const _IBKR_CONN = Ref{IBKRConnection}()
-
-function get_ibkr_connection(config::IBKRConfig = IBKRConfig())
-    if !isassigned(_IBKR_CONN)
-        _IBKR_CONN[] = IBKRConnection(config)
-    end
-    return _IBKR_CONN[]
 end
 
 # ── Wrapper (Jib callback handler) ────────────────────────────────────────────
 
 """
-Build a minimal Jib wrapper that handles the callbacks we care about:
-- nextValidId   → sets next_order_id
-- orderStatus   → logs fill status
-- position      → updates positions dict
-- execDetails   → pushes to pending_fills channel
-
-All other Jib callbacks are silently ignored (they are optional in Jib).
+Build a minimal Jib wrapper handling the callbacks we care about:
+nextValidId → order id; orderStatus → log; position → positions dict;
+execDetails → pending_fills channel. Other callbacks are ignored.
 """
 function _build_wrapper(ibkr::IBKRConnection)
-    # Jib.Wrapper is a NamedTuple of optional callbacks.
-    # Only define the ones we need.
     return (
         nextValidId = (orderId::Int) -> begin
             lock(ibkr._lock) do
@@ -105,14 +94,19 @@ function _build_wrapper(ibkr::IBKRConnection)
                 side       = execution.side,
                 timestamp  = now(UTC)
             )
-            isready(ibkr.pending_fills) || put!(ibkr.pending_fills, fill_record)
+            # Every fill MUST be recorded (REQ-AUDIT-001) — never drop. Buffer is 256;
+            # if it is ever full, blocking here signals the drain loop is behind, which
+            # is far preferable to silently discarding an audit record.
+            if Base.n_avail(ibkr.pending_fills) >= 250
+                @error "pending_fills near capacity — drain loop is behind" n=Base.n_avail(ibkr.pending_fills)
+            end
+            put!(ibkr.pending_fills, fill_record)
             @info "IBKR execDetails" symbol=contract.symbol price=execution.price shares=execution.shares side=execution.side
         end,
 
         error = (id, errorCode, errorString, advancedOrderRejectJson) -> begin
             if errorCode in (2104, 2106, 2158, 2119)
-                # Informational codes — not errors
-                @debug "IBKR info" code=errorCode msg=errorString
+                @debug "IBKR info" code=errorCode msg=errorString   # informational, not errors
             else
                 @warn "IBKR error" id=id code=errorCode msg=errorString
             end
@@ -130,20 +124,20 @@ end
 # ── Connect / disconnect ──────────────────────────────────────────────────────
 
 """
-    connect_ibkr([config]) -> Bool
+    connect_ibkr(ibkr::IBKRConnection) -> Bool
 
-Establish connection to TWS or IB Gateway via Jib.jl.
-Starts the Jib reader task and requests the next valid order ID.
+Establish a connection to TWS or IB Gateway for this connection instance via
+Jib.jl. Starts the reader task and requests the next valid order id.
 """
-function connect_ibkr(config::IBKRConfig = IBKRConfig())::Bool
-    ibkr = get_ibkr_connection(config)
+function connect_ibkr(ibkr::IBKRConnection)::Bool
+    cfg = ibkr.config
     lock(ibkr._lock) do
         ibkr.is_connected && return true   # already connected
 
-        for attempt in 1:config.reconnect_attempts
+        for attempt in 1:cfg.reconnect_attempts
             try
                 wrapper = _build_wrapper(ibkr)
-                conn    = Jib.connect(config.host, config.port, config.client_id)
+                conn    = Jib.connect(cfg.host, cfg.port, cfg.client_id)
                 reader  = Jib.start_reader(conn, wrapper)
 
                 ibkr.conn         = conn
@@ -151,27 +145,24 @@ function connect_ibkr(config::IBKRConfig = IBKRConfig())::Bool
                 ibkr.reader       = reader
                 ibkr.is_connected = true
 
-                # Request next valid order ID — populates next_order_id via callback
-                Jib.Requests.reqIds(conn, 1)
-                # Request initial position snapshot
-                Jib.Requests.reqPositions(conn)
+                Jib.Requests.reqIds(conn, 1)        # → next_order_id via callback
+                Jib.Requests.reqPositions(conn)     # → initial position snapshot
 
-                @info "Connected to IBKR" host=config.host port=config.port client_id=config.client_id attempt=attempt
+                @info "Connected to IBKR" host=cfg.host port=cfg.port client_id=cfg.client_id attempt=attempt
                 return true
             catch e
                 @warn "IBKR connection attempt $(attempt) failed" exception=e
-                attempt < config.reconnect_attempts && sleep(config.reconnect_delay_sec)
+                attempt < cfg.reconnect_attempts && sleep(cfg.reconnect_delay_sec)
             end
         end
 
         ibkr.is_connected = false
-        @error "Failed to connect to IBKR after $(config.reconnect_attempts) attempts"
+        @error "Failed to connect to IBKR after $(cfg.reconnect_attempts) attempts"
         return false
     end
 end
 
-function disconnect_ibkr()
-    ibkr = get_ibkr_connection()
+function disconnect_ibkr(ibkr::IBKRConnection)
     lock(ibkr._lock) do
         if ibkr.is_connected && ibkr.conn !== nothing
             Jib.disconnect(ibkr.conn)
@@ -185,22 +176,14 @@ end
 # ── Order submission ──────────────────────────────────────────────────────────
 
 """
-    reserve_and_place(build::Function) -> (success, order_id, error)
+    reserve_and_place(ibkr::IBKRConnection, build::Function) -> (success, order_id, error)
 
 Allocate the next IBKR order id and place the order under a SINGLE lock, so
-submission is strictly serial per connection and the order-id allocation is
-atomic with the placement (REQ-EXEC-001).
-
-`build(oid::Int) -> (contract::Jib.Contract, order::Jib.Order)` constructs the
-Jib objects for the reserved id; this function calls `Jib.Requests.placeOrder`.
-The fill arrives asynchronously via the `execDetails` callback and lands on
-`ibkr.pending_fills` for the FeedbackLayer.ExecutionLedger to consume.
-
-Venue-specific translation of a canonical `VenueOrder` lives in `venues/ibkr.jl`;
-this primitive is order-model-agnostic on purpose.
+submission is serial and order-id allocation is atomic with placement
+(REQ-EXEC-001). `build(oid::Int) -> (contract::Jib.Contract, order::Jib.Order)`.
+The fill arrives asynchronously via `execDetails` on `ibkr.pending_fills`.
 """
-function reserve_and_place(build::Function)::Tuple{Bool, String, Union{Nothing,String}}
-    ibkr = get_ibkr_connection()
+function reserve_and_place(ibkr::IBKRConnection, build::Function)::Tuple{Bool, String, Union{Nothing,String}}
     lock(ibkr._lock) do
         !ibkr.is_connected && return (false, "", "Not connected to IBKR")
         try
@@ -216,22 +199,18 @@ function reserve_and_place(build::Function)::Tuple{Bool, String, Union{Nothing,S
     end
 end
 
-# ── Position query ────────────────────────────────────────────────────────────
+# ── Position query / fill drain ───────────────────────────────────────────────
 
 """
-    ibkr_get_positions(account::String) -> Dict{String,Float64}
+    ibkr_get_positions(ibkr::IBKRConnection, account::String) -> Dict{String,Float64}
 
-Return positions from the in-memory cache (populated by reqPositions callback).
-Re-requests a snapshot if the cache is empty. On strategy restart, this is
-the authoritative source of truth for reconciling the FeedbackLayer ledger.
+Positions from the in-memory cache (populated by reqPositions callbacks). Re-requests
+a snapshot if empty. Authoritative broker-truth source for reconciliation (REQ-EXEC-003).
 """
-function ibkr_get_positions(account::String)::Dict{String,Float64}
-    ibkr = get_ibkr_connection()
+function ibkr_get_positions(ibkr::IBKRConnection, account::String)::Dict{String,Float64}
     !ibkr.is_connected && return Dict{String,Float64}()
-
     lock(ibkr._lock) do
         if isempty(ibkr.positions)
-            # Positions haven't arrived yet — re-request and wait briefly
             Jib.Requests.reqPositions(ibkr.conn)
             sleep(0.5)   # callbacks populate ibkr.positions asynchronously
         end
@@ -240,13 +219,12 @@ function ibkr_get_positions(account::String)::Dict{String,Float64}
 end
 
 """
-    drain_pending_fills(max_fills::Int=100) -> Vector{NamedTuple}
+    drain_pending_fills(ibkr::IBKRConnection, max_fills::Int=100) -> Vector{NamedTuple}
 
-Drain the pending fills channel. Call from the FeedbackLayer fill-recording
-loop to convert execDetails callbacks into FillRecord entries in the ledger.
+Drain the pending-fills channel. Called from the FeedbackLayer fill-recording loop
+to convert execDetails callbacks into ledger FillRecord entries.
 """
-function drain_pending_fills(max_fills::Int=100)::Vector{NamedTuple}
-    ibkr  = get_ibkr_connection()
+function drain_pending_fills(ibkr::IBKRConnection, max_fills::Int=100)::Vector{NamedTuple}
     fills = NamedTuple[]
     count = 0
     while isready(ibkr.pending_fills) && count < max_fills
@@ -257,30 +235,35 @@ function drain_pending_fills(max_fills::Int=100)::Vector{NamedTuple}
 end
 
 # ── Market data / options chain ───────────────────────────────────────────────
+# Market-data / query request ids come from `next_req_id` (a SEPARATE id space from
+# order ids) and are allocated under the lock — never from `next_order_id`.
+
+function _reserve_req_id(ibkr::IBKRConnection)::Int
+    lock(ibkr._lock) do
+        rid = ibkr.next_req_id
+        ibkr.next_req_id += 1
+        return rid
+    end
+end
 
 """
-    ibkr_req_mkt_data(symbol, tick_list) -> Int
+    ibkr_req_mkt_data(ibkr, symbol, tick_list, secType) -> Int
 
-Request market data for `symbol`. Returns reqId. Data arrives via wrapper
-callbacks (not captured here — caller must supply a wrapper that handles
-tickPrice / tickSize / tickOptionComputation).
-
-For 0DTE option Greeks: use tick_list = "100,101,106" (option Greeks ticks).
+Request market data for `symbol`. Returns reqId. Data arrives via wrapper callbacks.
+For 0DTE option Greeks: tick_list = "100,101,106".
 """
 function ibkr_req_mkt_data(
+    ibkr::IBKRConnection,
     symbol::String,
     tick_list::String = "100,101,106",
     secType::String   = "STK"
 )::Int
-    ibkr = get_ibkr_connection()
-    !ibkr.is_connected && return -1
-
-    req_id = ibkr.next_order_id
-    ibkr.next_order_id += 1
+    ibkr.is_connected || return -1
+    req_id = _reserve_req_id(ibkr)
 
     contract = Jib.Contract()
-    contract.symbol  = symbol
-    contract.secType = secType
+    contract.symbol   = symbol
+    contract.secType  = secType
     contract.exchange = "SMART"
     contract.currency = "USD"
 
@@ -290,23 +273,19 @@ function ibkr_req_mkt_data(
 end
 
 """
-    ibkr_req_sec_def_opt_params(symbol, exchange) -> Int
+    ibkr_req_sec_def_opt_params(ibkr, symbol, exchange) -> Int
 
-Request option chain parameters (expirations, strikes) for `symbol`.
-Results arrive via the secDefOptParams wrapper callback.
-Use this to discover available 0DTE expirations each morning.
+Request option-chain parameters (expirations, strikes). Results arrive via the
+secDefOptParams callback. Use to discover 0DTE expirations each morning.
 """
 function ibkr_req_sec_def_opt_params(
+    ibkr::IBKRConnection,
     symbol::String,
     exchange::String = "SMART"
 )::Int
-    ibkr = get_ibkr_connection()
-    !ibkr.is_connected && return -1
-
-    req_id = ibkr.next_order_id
-    ibkr.next_order_id += 1
+    ibkr.is_connected || return -1
+    req_id = _reserve_req_id(ibkr)
     Jib.Requests.reqSecDefOptParams(ibkr.conn, req_id, symbol, exchange, "STK", 0)
     @info "reqSecDefOptParams sent" symbol=symbol reqId=req_id
     return req_id
 end
-

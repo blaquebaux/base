@@ -1,9 +1,9 @@
 # ============================================================================
 # IBKR VENUE ADAPTER — IBKRVenue <: ExecutionVenue
 # ----------------------------------------------------------------------------
-# Thin adapter: translates a canonical VenueOrder to Jib.jl Contract/Order and
-# delegates connection/session management to ibkr_connection.jl. Carries NO
-# safety logic — that lives in ExecutionController (built once, all venues share).
+# Thin adapter: translates a canonical VenueOrder to Jib.jl and delegates
+# connection/session management to an IBKRConnection it OWNS (no global
+# singleton). Carries NO safety logic — that lives in ExecutionController.
 #
 # Requires (included earlier in ExecutionLayer): venue_interface.jl, ibkr_connection.jl
 # ============================================================================
@@ -11,24 +11,33 @@
 """
     IBKRVenue(; kwargs...) <: ExecutionVenue
 
-Interactive Brokers execution venue over Jib.jl / TWS-Gateway.
-Defaults to the PAPER port (7497). Live requires an explicit config change —
-and the governed invariants must be green first (see HONEST-ASSESSMENT.md).
+Interactive Brokers execution venue over Jib.jl / TWS-Gateway. Owns its
+`IBKRConnection`. Defaults to the PAPER port (7497). Going live requires an
+explicit config change AND the governed invariants green (see HONEST-ASSESSMENT.md).
 """
 struct IBKRVenue <: ExecutionVenue
-    config::IBKRConfig
+    conn::IBKRConnection
 end
-IBKRVenue(; kwargs...) = IBKRVenue(IBKRConfig(; kwargs...))
+IBKRVenue(conn_config::IBKRConfig) = IBKRVenue(IBKRConnection(conn_config))
+IBKRVenue(; kwargs...) = IBKRVenue(IBKRConnection(IBKRConfig(; kwargs...)))
 
-connect!(v::IBKRVenue)::Bool          = connect_ibkr(v.config)
-disconnect!(::IBKRVenue)              = disconnect_ibkr()
-is_connected(::IBKRVenue)::Bool       = get_ibkr_connection().is_connected
-positions(::IBKRVenue, account::String)::Dict{String,Float64} = ibkr_get_positions(account)
+connect!(v::IBKRVenue)::Bool                     = connect_ibkr(v.conn)
+disconnect!(v::IBKRVenue)                        = disconnect_ibkr(v.conn)
+is_connected(v::IBKRVenue)::Bool                 = v.conn.is_connected
+positions(v::IBKRVenue, account::String)::Dict{String,Float64} = ibkr_get_positions(v.conn, account)
 
-# US equities to start: STK/SMART/USD. Other asset classes (futures, options,
-# non-US equities) extend this translation when their pools go live.
+# US equities to start: STK/SMART/USD. Other asset classes extend this translation
+# when their pools go live.
 function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
-    ok, oid, err = reserve_and_place() do assigned_oid
+    # #5 — US equities are whole shares. Reject fractional rather than silently
+    # rounding (rounding would change the order size). Fractional support is an
+    # explicit future flag, not an accident.
+    if o.quantity != round(o.quantity)
+        return OrderAck(false, "", o.client_order_id,
+                        "IBKR STK requires whole shares; got quantity=$(o.quantity)")
+    end
+
+    ok, oid, err = reserve_and_place(v.conn) do assigned_oid
         contract = Jib.Contract()
         contract.symbol   = o.symbol
         contract.secType  = "STK"
@@ -50,12 +59,11 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
     return OrderAck(ok, ok ? oid : "", o.client_order_id, err)
 end
 
-function cancel!(::IBKRVenue, venue_order_id::String)::Bool
-    ibkr = get_ibkr_connection()
-    ibkr.is_connected || return false
-    lock(ibkr._lock) do
+function cancel!(v::IBKRVenue, venue_order_id::String)::Bool
+    v.conn.is_connected || return false
+    lock(v.conn._lock) do
         try
-            Jib.Requests.cancelOrder(ibkr.conn, parse(Int, venue_order_id))
+            Jib.Requests.cancelOrder(v.conn.conn, parse(Int, venue_order_id))
             return true
         catch e
             @warn "cancel! failed" venue_order_id=venue_order_id exception=e

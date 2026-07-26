@@ -25,6 +25,11 @@ connection code come first.
       (`execution_controller.jl`) with the kill switch (REQ-GOV-002) enforced and every
       other invariant marked as an explicit governance gap. Fixed the order-model bug in
       the old Jib code. Parses clean under Julia 1.12.
+- [x] **Step 1.5 — hardening (review findings).** Fixed: dropped-fills guard (AUDIT-001
+      integrity), market-data/order-id race via separate locked `next_req_id` (EXEC-001
+      integrity), venue-owned connection (removed global singleton), reject fractional
+      equity shares. Verified no export collisions. Open: Jib API unverified until a paper
+      Gateway run (#4).
 - [ ] **Step 2 — REQ-EXEC-002 (idempotency) + REQ-EXEC-003 (reconciliation).** Dedup on
       `client_order_id` in `submit_governed!` (return prior ack on repeat); reconcile vs
       `venue positions()` on a cadence, halt-on-divergence. Do first — they live in the

@@ -9,7 +9,7 @@ export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        # Venue-adapter execution (venue-agnostic governed path)
        ExecutionVenue, VenueOrder, OrderAck,
        connect!, disconnect!, is_connected, submit!, cancel!, positions,
-       IBKRVenue, IBKRConfig, get_ibkr_connection, drain_pending_fills,
+       IBKRVenue, IBKRConfig, IBKRConnection, drain_pending_fills,
        ExecutionController, submit_governed!, halt!, resume!
 
 # ============================================================================

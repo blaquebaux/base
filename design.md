@@ -54,6 +54,15 @@ src/module_7_execution/
   code whose order model didn't match `IBKROrder` (referenced `order.action`, `order.tif`,
   compared an enum to `"LMT"`). Replaced with the order-model-agnostic `reserve_and_place`
   primitive; the canonical translation now lives in `venues/ibkr.jl`.
+- **Step 1.5 hardening (review findings):** (1) `execDetails` no longer drops fills —
+  the inverted `isready || put!` guard that silently discarded fills when the channel was
+  non-empty is replaced with an unconditional `put!` (REQ-AUDIT-001 integrity); (2) market-
+  data requests use a separate locked `next_req_id`, so they can no longer race/collide
+  with the order-id sequence (REQ-EXEC-001 integrity); (3) the connection is instance-owned
+  by `IBKRVenue` (global `_IBKR_CONN` singleton removed), so multiple venues/accounts can
+  coexist; (4) fractional-share equity orders are rejected, not silently rounded; (5) no
+  export collisions (verified). Open: (#4) all Jib API calls remain unverified until run
+  against a paper Gateway.
 - **Asset scope:** `venues/ibkr.jl` translates US equities (STK/SMART/USD) to start;
   futures/options/non-US extend the same adapter when those pools go live.
 
