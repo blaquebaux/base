@@ -178,11 +178,21 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
     end
 
     # REQ-AUDIT-002 — lineage is a precondition of emission; reject if incomplete.
-    missing = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
-                                   ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
-    if !isempty(missing)
+    missing_lineage = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
+                                          ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
+    if !isempty(missing_lineage)
         return OrderAck(:rejected, "", o.client_order_id,
-                        "REJECTED (REQ-AUDIT-002): missing lineage " * join(missing, ", "))
+                        "REJECTED (REQ-AUDIT-002): missing lineage " * join(missing_lineage, ", "))
+    end
+
+    # H1 — pool-disjoint symbols. `expected`/`symbol_pool` track per symbol, so a symbol must
+    # belong to exactly one pool or per-pool reconcile attribution breaks. Enforce it rather
+    # than silently mis-attribute. (If cross-pool symbols are ever needed, key state by
+    # (pool, symbol) instead.)
+    if haskey(ctrl.symbol_pool, o.symbol) && ctrl.symbol_pool[o.symbol] != o.pool_id
+        return OrderAck(:rejected, "", o.client_order_id,
+                        "REJECTED: symbol $(o.symbol) already assigned to pool " *
+                        "$(ctrl.symbol_pool[o.symbol]); cross-pool symbol reuse is unsupported.")
     end
 
     # REQ-RISK-004 (enforcement) — per-pool halt (loss-limit breach or manual pool halt).
@@ -303,6 +313,10 @@ false; else true. Call `process_fills!` first so `expected` reflects the latest 
 
 Per-pool (step 4): a diverging symbol halts its own pool (via `symbol_pool`); a diverging
 symbol with no known pool triggers a controller-wide halt (fail-safe — we can't scope it).
+
+⚠️ Ordering: `expected` only reflects fills that `process_fills!` has already applied. Call
+`process_fills!` immediately before `reconcile!` (or use `process_and_reconcile!`) — a stale
+`expected` will false-halt (fail-safe, but a nuisance).
 """
 function reconcile!(ctrl::ExecutionController)::Bool
     broker = positions(ctrl.venue, ctrl.account)
@@ -335,4 +349,15 @@ function reconcile!(ctrl::ExecutionController)::Bool
         halt!(ctrl, "unscoped reconciliation divergence (REQ-EXEC-003): " * join(unscoped, "; "))
     end
     return false
+end
+
+"""
+    process_and_reconcile!(ctrl; record=(_->nothing)) -> Bool
+
+Convenience: apply the latest fills, then reconcile — the correct order (H3). Returns
+`reconcile!`'s result.
+"""
+function process_and_reconcile!(ctrl::ExecutionController; record::Function = (_) -> nothing)::Bool
+    process_fills!(ctrl; record=record)
+    return reconcile!(ctrl)
 end

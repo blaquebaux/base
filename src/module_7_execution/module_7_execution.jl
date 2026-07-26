@@ -11,7 +11,7 @@ export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        connect!, disconnect!, is_connected, submit!, cancel!, positions, drain_fills,
        IBKRVenue, IBKRConfig, IBKRConnection, drain_pending_fills,
        ExecutionController, submit_governed!, halt!, resume!, reconcile!, rehydrate!,
-       apply_fill!, process_fills!,
+       apply_fill!, process_fills!, process_and_reconcile!,
        set_pool_budget!, set_pool_loss_limit!, update_pnl!,
        halt_pool!, resume_pool!, reset_daily!
 
