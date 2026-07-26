@@ -65,15 +65,20 @@ connection code come first.
 *Alpaca is a later `venues/alpaca.jl` adapter selected by deployment config on a second
 fleet machine — not a repo clone. The governed controller above is built once.*
 
+- [x] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (loss halt) + per-pool halt.**
+      `submit_governed!` enforces a per-pool daily gross-notional budget before emission
+      (`set_pool_budget!`; `VenueOrder.ref_price` added so market orders can be sized).
+      `update_pnl!` halts a pool on daily-loss-limit breach until explicit `resume_pool!`
+      (`reset_daily!` clears counters but does not lift halts). `reconcile!` halt upgraded
+      from controller-wide to per-pool via `symbol_pool`. Gate order: idempotency → global
+      halt → lineage → per-pool halt → budget → submit. Tests = step 6.
+
 ## P1b — remaining live-capital invariants
 
-- [ ] **REQ-RISK-004 (loss halt)** — Per-pool daily loss limit; on breach, halt new
-      emission until an explicit, logged human re-enable. (Circuit breaker in `module_7`
-      exists; the loss-limit + re-enable does not.)
 - [ ] **REQ-DATA-003 (staleness halt)** — Execution path halts (not warns) on data older
       than a per-venue threshold. `module_1` has staleness *detection*; wire it to a halt.
-- [ ] **REQ-GOV-002 (kill switch)** — Manual halt of all new emission within a bounded
-      time, halt event audit-logged.
+- [ ] **REQ-GOV-002 (kill switch)** — bounded-time guarantee + write halt events to the
+      `module_8_governance` audit log (kill switch itself is enforced; step 5 completes it).
 
 ## P2 — cover the untested modules 9–13 (the coverage cliff)
 

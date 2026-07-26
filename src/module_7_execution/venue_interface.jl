@@ -52,10 +52,12 @@ struct VenueOrder
     signal_id::Union{String,Nothing}
     regime::Union{String,Nothing}
     solve_id::Union{String,Nothing}
+    ref_price::Union{Float64,Nothing}   # decision-time reference price; lets a market order
+                                        # be notional-checked at the budget gate (REQ-RISK-003)
 
     function VenueOrder(client_order_id, symbol, side, quantity, order_type,
                         limit_price, tif, account, pool_id,
-                        signal_id, regime, solve_id)
+                        signal_id, regime, solve_id, ref_price)
         @assert !isempty(client_order_id) "client_order_id (idempotency key) required — REQ-EXEC-002"
         @assert side in (:buy, :sell) "side must be :buy or :sell, got $side"
         @assert order_type in (:market, :limit) "order_type must be :market or :limit, got $order_type"
@@ -65,8 +67,9 @@ struct VenueOrder
             @assert limit_price !== nothing "limit_price required for :limit orders"
             @assert limit_price > 0 "limit_price must be positive"
         end
+        ref_price === nothing || @assert ref_price > 0 "ref_price must be positive if given"
         new(client_order_id, symbol, side, quantity, order_type, limit_price,
-            tif, account, pool_id, signal_id, regime, solve_id)
+            tif, account, pool_id, signal_id, regime, solve_id, ref_price)
     end
 end
 
@@ -75,10 +78,12 @@ function VenueOrder(; client_order_id::String, symbol::String, side::Symbol,
                     quantity::Real, order_type::Symbol=:market,
                     limit_price::Union{Real,Nothing}=nothing, tif::Symbol=:day,
                     account::String="", pool_id::String="",
-                    signal_id=nothing, regime=nothing, solve_id=nothing)
+                    signal_id=nothing, regime=nothing, solve_id=nothing,
+                    ref_price::Union{Real,Nothing}=nothing)
     VenueOrder(client_order_id, symbol, side, float(quantity), order_type,
                limit_price === nothing ? nothing : float(limit_price),
-               tif, account, pool_id, signal_id, regime, solve_id)
+               tif, account, pool_id, signal_id, regime, solve_id,
+               ref_price === nothing ? nothing : float(ref_price))
 end
 
 """
