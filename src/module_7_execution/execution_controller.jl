@@ -33,7 +33,9 @@ mutable struct ExecutionController{V<:ExecutionVenue}
     # STEP 4: pool_budgets / daily_pnl (REQ-RISK-003/004) — per-pool state, incl. per-pool halt
 end
 
-ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=0.0) =
+# recon_tolerance default is a small epsilon (F4): catches any ≥1-share divergence while
+# ignoring float-accumulation noise. Raise it for a deliberate business tolerance.
+ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=1e-6) =
     ExecutionController(v, false, nothing, account,
                         Dict{String,OrderAck}(), Dict{String,Float64}(), float(recon_tolerance))
 
@@ -79,7 +81,7 @@ idempotency; lineage (STEP 3) and budget/loss (STEP 4) gaps are marked below.
 function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
     # REQ-GOV-002 — kill switch
     if ctrl.halted
-        return OrderAck(false, "", o.client_order_id,
+        return OrderAck(:rejected, "", o.client_order_id,
                         "HALTED (REQ-GOV-002): $(ctrl.halt_reason)")
     end
 
@@ -99,13 +101,11 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
 
     ack = submit!(ctrl.venue, o)
 
-    if ack.accepted
+    # F2 — lock the client_order_id if the order is accepted OR uncertain (may be live).
+    # Only a clean :rejected leaves the id free to retry. This closes the within-session
+    # ack-loss double-submit, not just the cross-restart case.
+    if islocked_id(ack)
         ctrl.seen[o.client_order_id] = ack
-        # Optimistic expected-position update. Authoritative source becomes the fill
-        # ledger (module_10) once lineage lands (step 3); until then this is the
-        # controller's best estimate for reconciliation.
-        signed = o.side === :buy ? o.quantity : -o.quantity
-        ctrl.expected[o.symbol] = get(ctrl.expected, o.symbol, 0.0) + signed
     end
     return ack
 end
@@ -118,9 +118,11 @@ end
 Compare the controller's expected positions against broker-reported positions.
 On any divergence beyond `recon_tolerance`, HALT and return false; otherwise true.
 
-STEP 2 halts the whole controller (conservative). Per-pool halt arrives with the
-per-pool state in step 4. Expected positions are optimistic until the ledger is
-authoritative (step 3).
+⚠️ NOT OPERATIONAL until step 3: `expected` is populated from the FILL stream (F1),
+not from submitted orders — order quantity ≠ filled quantity, so an order-based
+`expected` would false-halt on any working/unfilled/partial order. Step 3 wires
+`apply_fill!` from the ledger; until then `expected` is empty and this must not be
+relied on. Per-pool (vs controller-wide) halt arrives with step 4.
 """
 function reconcile!(ctrl::ExecutionController)::Bool
     broker = positions(ctrl.venue, ctrl.account)

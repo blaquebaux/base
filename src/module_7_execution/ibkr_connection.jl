@@ -131,35 +131,38 @@ Jib.jl. Starts the reader task and requests the next valid order id.
 """
 function connect_ibkr(ibkr::IBKRConnection)::Bool
     cfg = ibkr.config
-    lock(ibkr._lock) do
-        ibkr.is_connected && return true   # already connected
+    # Fast path — already connected. (F3: hold the lock only around state, not I/O.)
+    lock(ibkr._lock) do; ibkr.is_connected end && return true
+    # NOTE: not fully re-entrant against two simultaneous connect callers; connect is a
+    # startup/reconnect operation, not a hot path. A "connecting" guard can be added if needed.
 
-        for attempt in 1:cfg.reconnect_attempts
-            try
-                wrapper = _build_wrapper(ibkr)
-                conn    = Jib.connect(cfg.host, cfg.port, cfg.client_id)
-                reader  = Jib.start_reader(conn, wrapper)
+    for attempt in 1:cfg.reconnect_attempts
+        try
+            wrapper = _build_wrapper(ibkr)
+            conn    = Jib.connect(cfg.host, cfg.port, cfg.client_id)   # network I/O — no lock
+            reader  = Jib.start_reader(conn, wrapper)
 
+            lock(ibkr._lock) do        # lock only the state mutation
                 ibkr.conn         = conn
                 ibkr.wrapper      = wrapper
                 ibkr.reader       = reader
                 ibkr.is_connected = true
-
-                Jib.Requests.reqIds(conn, 1)        # → next_order_id via callback
-                Jib.Requests.reqPositions(conn)     # → initial position snapshot
-
-                @info "Connected to IBKR" host=cfg.host port=cfg.port client_id=cfg.client_id attempt=attempt
-                return true
-            catch e
-                @warn "IBKR connection attempt $(attempt) failed" exception=e
-                attempt < cfg.reconnect_attempts && sleep(cfg.reconnect_delay_sec)
             end
-        end
 
-        ibkr.is_connected = false
-        @error "Failed to connect to IBKR after $(cfg.reconnect_attempts) attempts"
-        return false
+            Jib.Requests.reqIds(conn, 1)        # → next_order_id via callback
+            Jib.Requests.reqPositions(conn)     # → initial position snapshot
+
+            @info "Connected to IBKR" host=cfg.host port=cfg.port client_id=cfg.client_id attempt=attempt
+            return true
+        catch e
+            @warn "IBKR connection attempt $(attempt) failed" exception=e
+            attempt < cfg.reconnect_attempts && sleep(cfg.reconnect_delay_sec)   # sleep — no lock
+        end
     end
+
+    lock(ibkr._lock) do; ibkr.is_connected = false end
+    @error "Failed to connect to IBKR after $(cfg.reconnect_attempts) attempts"
+    return false
 end
 
 function disconnect_ibkr(ibkr::IBKRConnection)
@@ -183,18 +186,22 @@ submission is serial and order-id allocation is atomic with placement
 (REQ-EXEC-001). `build(oid::Int) -> (contract::Jib.Contract, order::Jib.Order)`.
 The fill arrives asynchronously via `execDetails` on `ibkr.pending_fills`.
 """
-function reserve_and_place(ibkr::IBKRConnection, build::Function)::Tuple{Bool, String, Union{Nothing,String}}
+function reserve_and_place(ibkr::IBKRConnection, build::Function)::Tuple{Symbol, String, Union{Nothing,String}}
     lock(ibkr._lock) do
-        !ibkr.is_connected && return (false, "", "Not connected to IBKR")
+        # Not connected → the order definitely did not go out; safe to retry.
+        !ibkr.is_connected && return (:rejected, "", "Not connected to IBKR")
+        oid = ibkr.next_order_id
+        ibkr.next_order_id += 1
         try
-            oid = ibkr.next_order_id
-            ibkr.next_order_id += 1
             contract, jib_order = build(oid)
             Jib.Requests.placeOrder(ibkr.conn, oid, contract, jib_order)
             @info "Order placed via Jib" symbol=contract.symbol oid=oid
-            return (true, string(oid), nothing)
+            return (:accepted, string(oid), nothing)
         catch e
-            return (false, "", "Order error: $e")
+            # placeOrder may have reached the broker before throwing → UNCERTAIN, not a
+            # clean rejection. The order id is already consumed; do not reuse it. The
+            # controller must lock this client_order_id, not retry it (F2 / REQ-EXEC-002).
+            return (:uncertain, string(oid), "Order error (may have reached broker): $e")
         end
     end
 end
@@ -209,12 +216,19 @@ a snapshot if empty. Authoritative broker-truth source for reconciliation (REQ-E
 """
 function ibkr_get_positions(ibkr::IBKRConnection, account::String)::Dict{String,Float64}
     !ibkr.is_connected && return Dict{String,Float64}()
-    lock(ibkr._lock) do
+    # F3: don't hold the lock across the async wait. Request under lock, sleep outside,
+    # then snapshot under lock.
+    requested = lock(ibkr._lock) do
         if isempty(ibkr.positions)
             Jib.Requests.reqPositions(ibkr.conn)
-            sleep(0.5)   # callbacks populate ibkr.positions asynchronously
+            true
+        else
+            false
         end
-        return copy(ibkr.positions)
+    end
+    requested && sleep(0.5)   # callbacks populate ibkr.positions asynchronously — outside the lock
+    return lock(ibkr._lock) do
+        copy(ibkr.positions)
     end
 end
 

@@ -84,15 +84,38 @@ end
 """
     OrderAck
 
-Result of a submission attempt. `client_order_id` is echoed back so callers can
-correlate the ack with their idempotency key.
+Result of a submission attempt. `status` is the source of truth (F2):
+
+- `:accepted`  — the venue confirmed receipt; `venue_order_id` is set.
+- `:rejected`  — the order was definitely **not** sent (pre-submit validation, or not
+                 connected). Safe to retry (ideally with a new `client_order_id`).
+- `:uncertain` — the send may have reached the broker but no confirmation was received
+                 (exception/timeout mid-placeOrder). **Must not be blindly retried** —
+                 the order could be live. The controller locks this `client_order_id`.
+
+`client_order_id` is echoed so callers can correlate with their idempotency key.
 """
 struct OrderAck
-    accepted::Bool
+    status::Symbol
     venue_order_id::String
     client_order_id::String
     error::Union{String,Nothing}
+
+    function OrderAck(status::Symbol, venue_order_id::String,
+                     client_order_id::String, error::Union{String,Nothing})
+        @assert status in (:accepted, :rejected, :uncertain) "status must be :accepted/:rejected/:uncertain, got $status"
+        new(status, venue_order_id, client_order_id, error)
+    end
 end
+
+"True iff the venue confirmed the order."
+isaccepted(a::OrderAck) = a.status === :accepted
+
+"""
+True iff this `client_order_id` must not be resubmitted — either accepted (already
+live) or uncertain (may be live). This is the idempotency-lock predicate (REQ-EXEC-002).
+"""
+islocked_id(a::OrderAck) = a.status === :accepted || a.status === :uncertain
 
 # ── The interface every venue must implement (stubs error until a venue adds a method) ──
 

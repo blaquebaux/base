@@ -33,11 +33,11 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
     # rounding (rounding would change the order size). Fractional support is an
     # explicit future flag, not an accident.
     if o.quantity != round(o.quantity)
-        return OrderAck(false, "", o.client_order_id,
+        return OrderAck(:rejected, "", o.client_order_id,
                         "IBKR STK requires whole shares; got quantity=$(o.quantity)")
     end
 
-    ok, oid, err = reserve_and_place(v.conn) do assigned_oid
+    status, oid, err = reserve_and_place(v.conn) do assigned_oid
         contract = Jib.Contract()
         contract.symbol   = o.symbol
         contract.secType  = "STK"
@@ -46,7 +46,10 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
 
         jib = Jib.Order()
         jib.orderId       = assigned_oid
-        jib.orderRef      = o.client_order_id   # broker echoes our idempotency key (REQ-EXEC-002)
+        # orderRef: broker echoes our idempotency key on orderStatus/execDetails, enabling
+        # reconciliation-based cross-restart idempotency (REQ-EXEC-002). Field name assumed
+        # from the Jib API — part of the unverified-Jib gap (#4), confirm on a paper Gateway.
+        jib.orderRef      = o.client_order_id
         jib.action        = o.side === :buy ? "BUY" : "SELL"
         jib.totalQuantity = o.quantity
         jib.orderType     = o.order_type === :limit ? "LMT" : "MKT"
@@ -57,7 +60,7 @@ function submit!(v::IBKRVenue, o::VenueOrder)::OrderAck
         isempty(o.account) || (jib.account = o.account)
         (contract, jib)
     end
-    return OrderAck(ok, ok ? oid : "", o.client_order_id, err)
+    return OrderAck(status, status === :accepted ? oid : "", o.client_order_id, err)
 end
 
 function cancel!(v::IBKRVenue, venue_order_id::String)::Bool

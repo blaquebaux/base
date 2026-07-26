@@ -36,8 +36,16 @@ connection code come first.
       vs broker positions and halts on divergence. Both `partial` (see design.md): cross-
       restart idempotency + authoritative expected-positions land with the ledger (step 3);
       per-pool halt with step 4.
-- [ ] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002.** Add `signal_id/regime/solve_id/
-      order_id` to `FillRecord`; reject any order with incomplete lineage at the controller gate.
+- [x] **Step 2.5 — review findings F2/F3/F4/F5.** `OrderAck` now carries `status`
+      (`:accepted`/`:rejected`/`:uncertain`); `:uncertain` (placeOrder threw — may be live)
+      locks the `client_order_id`, closing the within-session ack-loss double-submit (F2).
+      Connection/reconnect and `positions()` no longer hold the lock across network I/O or
+      sleeps (F3). `recon_tolerance` defaults to a small epsilon (F4). `orderRef`/`n_avail`
+      commented as assumptions (F5). F1 deferred to step 3 (below): `expected` is now empty
+      and `reconcile!` is marked not-operational until fills drive it.
+- [ ] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002 + F1.** Add `signal_id/regime/solve_id/
+      order_id` to `FillRecord`; reject any order with incomplete lineage at the controller
+      gate; drive `expected` from fills (`apply_fill!`) so `reconcile!` becomes operational.
 - [ ] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (daily loss halt).** Per-pool
       budget check before emission; loss-limit breach halts the pool until logged human re-enable.
 - [ ] **Step 5 — REQ-GOV-002 finish.** Bounded-time halt guarantee + write halt events to
