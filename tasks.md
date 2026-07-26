@@ -43,9 +43,13 @@ connection code come first.
       sleeps (F3). `recon_tolerance` defaults to a small epsilon (F4). `orderRef`/`n_avail`
       commented as assumptions (F5). F1 deferred to step 3 (below): `expected` is now empty
       and `reconcile!` is marked not-operational until fills drive it.
-- [ ] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002 + F1.** Add `signal_id/regime/solve_id/
-      order_id` to `FillRecord`; reject any order with incomplete lineage at the controller
-      gate; drive `expected` from fills (`apply_fill!`) so `reconcile!` becomes operational.
+- [x] **Step 3 — REQ-AUDIT-001 (P0) + REQ-AUDIT-002 + F1.** `FillRecord` now carries
+      `signal_id/regime/solve_id/order_id`; write-path constructor rejects empty lineage
+      (P0 VIOLATION fixed, enforced structurally); schema + migration for existing DBs.
+      `submit_governed!` rejects orders with incomplete lineage (AUDIT-002 gate). `expected`
+      is now fill-driven via `process_fills!`/`apply_fill!` (F1 fixed) → `reconcile!` operational.
+      Remaining: wire `process_fills!` → `record_fill` in the daily runner (integration); tests (step 6).
+      NOTE: orphan duplicate files flagged for cleanup (src/execution_ledger.jl et al.).
 - [ ] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (daily loss halt).** Per-pool
       budget check before emission; loss-limit breach halts the pool until logged human re-enable.
 - [ ] **Step 5 — REQ-GOV-002 finish.** Bounded-time halt guarantee + write halt events to

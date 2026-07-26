@@ -28,8 +28,9 @@ mutable struct ExecutionController{V<:ExecutionVenue}
     halt_reason::Union{String,Nothing}
     account::String
     seen::Dict{String,OrderAck}       # REQ-EXEC-002: client_order_id -> ack (in-process dedup)
-    expected::Dict{String,Float64}    # symbol -> signed qty we believe we hold (optimistic)
-    recon_tolerance::Float64          # shares; divergence beyond this halts (REQ-EXEC-003)
+    lineage::Dict{String,NamedTuple}  # venue_order_id -> (signal_id, regime, solve_id, client_order_id)
+    expected::Dict{String,Float64}    # symbol -> signed qty, driven from FILLS (REQ-EXEC-003)
+    recon_tolerance::Float64          # shares; divergence beyond this halts
     # STEP 4: pool_budgets / daily_pnl (REQ-RISK-003/004) — per-pool state, incl. per-pool halt
 end
 
@@ -37,7 +38,8 @@ end
 # ignoring float-accumulation noise. Raise it for a deliberate business tolerance.
 ExecutionController(v::ExecutionVenue; account::String="", recon_tolerance::Real=1e-6) =
     ExecutionController(v, false, nothing, account,
-                        Dict{String,OrderAck}(), Dict{String,Float64}(), float(recon_tolerance))
+                        Dict{String,OrderAck}(), Dict{String,NamedTuple}(),
+                        Dict{String,Float64}(), float(recon_tolerance))
 
 # ── Kill switch (REQ-GOV-002) ──────────────────────────────────────────────────
 
@@ -93,8 +95,17 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
         return ctrl.seen[o.client_order_id]
     end
 
+    # REQ-AUDIT-002 — lineage is a precondition of emission, not an annotation. Reject any
+    # order missing signal_id/regime/solve_id at the gate; never log-and-send. (Completes
+    # the enforcement complement to REQ-AUDIT-001's fill-lineage requirement.)
+    missing = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
+                                   ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
+    if !isempty(missing)
+        return OrderAck(:rejected, "", o.client_order_id,
+                        "REJECTED (REQ-AUDIT-002): missing lineage " * join(missing, ", "))
+    end
+
     # ───────────── GOVERNANCE GAPS (hard blockers to going live) ─────────────
-    #   REQ-AUDIT-002 [STEP 3]: reject if any of signal_id/regime/solve_id is nothing.
     #   REQ-RISK-003  [STEP 4]: reject if o would breach o.pool_id's budget.
     #   REQ-RISK-004  [STEP 4]: halt o.pool_id if its daily loss limit is breached.
     # ─────────────────────────────────────────────────────────────────────────
@@ -106,8 +117,68 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
     # ack-loss double-submit, not just the cross-restart case.
     if islocked_id(ack)
         ctrl.seen[o.client_order_id] = ack
+        # Record lineage keyed by venue order id so incoming fills can be tagged
+        # (REQ-AUDIT-001). Lineage is guaranteed present here by the AUDIT-002 gate above.
+        if !isempty(ack.venue_order_id)
+            ctrl.lineage[ack.venue_order_id] = (
+                signal_id       = o.signal_id,
+                regime          = o.regime,
+                solve_id        = o.solve_id,
+                client_order_id = o.client_order_id,
+            )
+        end
     end
     return ack
+end
+
+# ── Fill processing (F1: expected is FILL-driven, not order-driven) ────────────
+
+"""
+    apply_fill!(ctrl, symbol, signed_qty)
+
+Update expected position by an actual FILLED quantity (signed). This is the only
+thing that moves `expected` — never submitted order quantity — so reconciliation
+compares fills-to-fills against the broker (fixes F1).
+"""
+function apply_fill!(ctrl::ExecutionController, symbol::String, signed_qty::Float64)
+    ctrl.expected[symbol] = get(ctrl.expected, symbol, 0.0) + signed_qty
+    return nothing
+end
+
+"""
+    process_fills!(ctrl) -> Vector{NamedTuple}
+
+Drain confirmed fills from the venue, update expected positions from them (F1), and
+return each fill tagged with its decision lineage (looked up by venue order id). The
+caller records these to the execution ledger — and because `FillRecord` requires
+non-empty lineage (REQ-AUDIT-001), a fill whose lineage is missing here (logged as an
+error) cannot be silently recorded.
+"""
+function process_fills!(ctrl::ExecutionController)::Vector{NamedTuple}
+    enriched = NamedTuple[]
+    for f in drain_fills(ctrl.venue)
+        # IBKR execution.side is "BOT"/"SLD"; accept BUY/SELL too for other venues.
+        is_buy = f.side in ("BOT", "BUY", "buy")
+        signed = (is_buy ? 1.0 : -1.0) * abs(float(f.shares))
+        apply_fill!(ctrl, f.symbol, signed)
+
+        lin = get(ctrl.lineage, string(f.order_id), nothing)
+        if lin === nothing
+            @error "Fill has no known lineage — cannot be recorded (REQ-AUDIT-001)" order_id=f.order_id symbol=f.symbol
+        end
+        push!(enriched, (
+            symbol          = f.symbol,
+            order_id        = string(f.order_id),
+            signed_qty      = signed,
+            fill_price      = f.fill_price,
+            timestamp       = f.timestamp,
+            signal_id       = lin === nothing ? nothing : lin.signal_id,
+            regime          = lin === nothing ? nothing : lin.regime,
+            solve_id        = lin === nothing ? nothing : lin.solve_id,
+            client_order_id = lin === nothing ? nothing : lin.client_order_id,
+        ))
+    end
+    return enriched
 end
 
 # ── Reconciliation (REQ-EXEC-003) ──────────────────────────────────────────────
@@ -115,14 +186,11 @@ end
 """
     reconcile!(ctrl) -> Bool
 
-Compare the controller's expected positions against broker-reported positions.
-On any divergence beyond `recon_tolerance`, HALT and return false; otherwise true.
+Compare the controller's (fill-driven) expected positions against broker-reported
+positions. On any divergence beyond `recon_tolerance`, HALT and return false; else true.
 
-⚠️ NOT OPERATIONAL until step 3: `expected` is populated from the FILL stream (F1),
-not from submitted orders — order quantity ≠ filled quantity, so an order-based
-`expected` would false-halt on any working/unfilled/partial order. Step 3 wires
-`apply_fill!` from the ledger; until then `expected` is empty and this must not be
-relied on. Per-pool (vs controller-wide) halt arrives with step 4.
+Call `process_fills!` first so `expected` reflects the latest fills. Halt is currently
+controller-wide; per-pool halt arrives with the per-pool state in step 4.
 """
 function reconcile!(ctrl::ExecutionController)::Bool
     broker = positions(ctrl.venue, ctrl.account)

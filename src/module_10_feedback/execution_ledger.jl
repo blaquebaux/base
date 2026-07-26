@@ -97,6 +97,14 @@ so that impact estimation arithmetic never hits a missing-value edge case.
 - `volume_ratio::Float64`: `|signed_qty| / adv_interval` — pre-computed at record time
 - `is_material::Bool`: `volume_ratio >= materiality_threshold`
 - `estimated_impact::Float64`: `volume_ratio * sigma_interval` (dimensionless, pre-sign)
+
+## Decision lineage (REQ-AUDIT-001)
+Every fill must trace its full causal chain. A fill with any missing lineage field is a
+defect; the write-path constructor rejects empty values.
+- `signal_id::String`: the signal that produced the decision
+- `regime::String`: the Gamma-ARMA regime state at decision time
+- `solve_id::String`: the QP/portfolio solve that sized the order
+- `order_id::String`: the venue order id this fill belongs to (one order → many fills)
 """
 struct FillRecord
     fill_id::String
@@ -110,6 +118,10 @@ struct FillRecord
     volume_ratio::Float64
     is_material::Bool
     estimated_impact::Float64
+    signal_id::String
+    regime::String
+    solve_id::String
+    order_id::String
 end
 
 """
@@ -129,15 +141,26 @@ function FillRecord(
     mid_price_before::Float64,
     adv_interval::Float64,
     sigma_interval::Float64;
+    signal_id::String,
+    regime::String,
+    solve_id::String,
+    order_id::String,
     materiality_threshold::Float64 = DEFAULT_MATERIALITY_THRESHOLD
 )::FillRecord
+    # REQ-AUDIT-001: lineage is mandatory on the write path — a fill missing any lineage
+    # field is a defect and cannot be recorded.
+    for (nm, v) in (("signal_id", signal_id), ("regime", regime),
+                    ("solve_id", solve_id), ("order_id", order_id))
+        @assert !isempty(v) "FillRecord missing lineage field '$nm' (REQ-AUDIT-001)"
+    end
     adv_interval = max(adv_interval, 1.0)  # guard against zero ADV on halts
     vr = abs(signed_qty) / adv_interval
     mat = vr >= materiality_threshold
     impact = vr * sigma_interval          # units: vol × qty_fraction; scaled by α later
     ts_ns = Int64(Dates.datetime2unix(timestamp) * 1_000_000_000)
     FillRecord(fill_id, symbol, ts_ns, signed_qty, fill_price,
-               mid_price_before, adv_interval, sigma_interval, vr, mat, impact)
+               mid_price_before, adv_interval, sigma_interval, vr, mat, impact,
+               signal_id, regime, solve_id, order_id)
 end
 
 # ── Ledger handle ─────────────────────────────────────────────────────────────
@@ -190,13 +213,15 @@ function record_fill(ledger::ExecutionLedger, fill::FillRecord)::Nothing
         INSERT OR IGNORE INTO fills (
             fill_id, symbol, timestamp_ns, signed_qty, fill_price,
             mid_price_before, adv_interval, sigma_interval,
-            volume_ratio, is_material, estimated_impact
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            volume_ratio, is_material, estimated_impact,
+            signal_id, regime, solve_id, order_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         fill.fill_id, fill.symbol, fill.timestamp_ns, fill.signed_qty,
         fill.fill_price, fill.mid_price_before, fill.adv_interval,
         fill.sigma_interval, fill.volume_ratio,
-        fill.is_material ? 1 : 0, fill.estimated_impact
+        fill.is_material ? 1 : 0, fill.estimated_impact,
+        fill.signal_id, fill.regime, fill.solve_id, fill.order_id
     ))
     return nothing
 end
@@ -474,9 +499,20 @@ function _init_ledger_schema(db::SQLite.DB)
             volume_ratio    REAL    NOT NULL,
             is_material     INTEGER NOT NULL DEFAULT 0,
             estimated_impact REAL   NOT NULL,
+            signal_id       TEXT    NOT NULL DEFAULT '',
+            regime          TEXT    NOT NULL DEFAULT '',
+            solve_id        TEXT    NOT NULL DEFAULT '',
+            order_id        TEXT    NOT NULL DEFAULT '',
             created_at      TEXT    DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # REQ-AUDIT-001 migration: add lineage columns to any pre-existing ledger DB.
+    _ensure_columns(db, "fills", [
+        ("signal_id", "TEXT NOT NULL DEFAULT ''"),
+        ("regime",    "TEXT NOT NULL DEFAULT ''"),
+        ("solve_id",  "TEXT NOT NULL DEFAULT ''"),
+        ("order_id",  "TEXT NOT NULL DEFAULT ''"),
+    ])
     DBInterface.execute(db, """
         CREATE INDEX IF NOT EXISTS idx_symbol_ts
         ON fills (symbol, timestamp_ns)
@@ -485,14 +521,31 @@ function _init_ledger_schema(db::SQLite.DB)
         CREATE INDEX IF NOT EXISTS idx_material
         ON fills (symbol, is_material)
     """)
+    DBInterface.execute(db, """
+        CREATE INDEX IF NOT EXISTS idx_order_id
+        ON fills (order_id)
+    """)
+end
+
+"Add any missing columns to `table` (idempotent lightweight migration)."
+function _ensure_columns(db::SQLite.DB, table::String, cols::Vector{Tuple{String,String}})
+    existing = Set(String(r.name) for r in DBInterface.execute(db, "PRAGMA table_info($table)"))
+    for (name, decl) in cols
+        if !(name in existing)
+            DBInterface.execute(db, "ALTER TABLE $table ADD COLUMN $name $decl")
+            @info "ledger migration: added column" table=table column=name
+        end
+    end
 end
 
 function _row_to_fill(r)::FillRecord
+    # Raw (read-path) constructor — no re-validation, so reads never fail.
     FillRecord(
         r.fill_id, r.symbol, r.timestamp_ns,
         r.signed_qty, r.fill_price, r.mid_price_before,
         r.adv_interval, r.sigma_interval,
-        r.volume_ratio, r.is_material == 1, r.estimated_impact
+        r.volume_ratio, r.is_material == 1, r.estimated_impact,
+        r.signal_id, r.regime, r.solve_id, r.order_id
     )
 end
 

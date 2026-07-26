@@ -100,3 +100,13 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
 - ℹ️ test files not yet cited by a REQ:test_module_2.jl test_module_3.jl 
 - ℹ️ features not in matrix (informational):REQ-FEAT-001 REQ-FEAT-002 
 - ✓ matrix fresh (0d)
+
+### spec-audit — 2026-07-26
+
+- invariants defined: 18 · in matrix: 18 · modules: 13 · tests: 15
+- ✓ every invariant is in the matrix
+- ✓ every module is claimed or acknowledged
+- ✓ all cited tests exist
+- ℹ️ test files not yet cited by a REQ:test_module_2.jl test_module_3.jl 
+- ℹ️ features not in matrix (informational):REQ-FEAT-001 REQ-FEAT-002 
+- ✓ matrix fresh (0d)

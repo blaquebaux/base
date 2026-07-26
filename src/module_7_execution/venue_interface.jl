@@ -131,3 +131,8 @@ cancel!(v::ExecutionVenue, venue_order_id::String)::Bool =
     error("cancel! not implemented for $(typeof(v))")
 positions(v::ExecutionVenue, account::String)::Dict{String,Float64} =
     error("positions not implemented for $(typeof(v))")
+# Drain confirmed fills since the last call. Each NamedTuple carries at least
+# (symbol, order_id, fill_price, shares, side, timestamp). The controller uses these
+# to drive expected positions (REQ-EXEC-003) and fill lineage (REQ-AUDIT-001).
+drain_fills(v::ExecutionVenue)::Vector{<:NamedTuple} =
+    error("drain_fills not implemented for $(typeof(v))")

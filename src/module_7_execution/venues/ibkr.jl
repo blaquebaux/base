@@ -25,6 +25,7 @@ connect!(v::IBKRVenue)::Bool                     = connect_ibkr(v.conn)
 disconnect!(v::IBKRVenue)                        = disconnect_ibkr(v.conn)
 is_connected(v::IBKRVenue)::Bool                 = v.conn.is_connected
 positions(v::IBKRVenue, account::String)::Dict{String,Float64} = ibkr_get_positions(v.conn, account)
+drain_fills(v::IBKRVenue) = drain_pending_fills(v.conn)
 
 # US equities to start: STK/SMART/USD. Other asset classes extend this translation
 # when their pools go live.
