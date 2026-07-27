@@ -2,6 +2,29 @@
 
 **Status:** draft for decision · **Date:** 2026-07-26 · **Owner:** C. Warrens
 
+## Decisions locked (2026-07-26)
+- **Language path: A now** (Python fleet + Julia governed execution via a bridge), drift
+  toward **B/C as a "day-3" item**.
+- **Market data: IBKR** (historical + live bars over the Gateway) — not Massive, not Polygon.
+  The recovered `data/fetcher.py` is repurposed to source from IBKR instead of Polygon.
+- **Scope: equity-first.** Multi-asset (crypto + other pools) is a **"day-2" item**.
+
+## Verification (deep-read, 2026-07-26)
+`risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
+**in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack
+are **real, mathematically sound, well-engineered** (correct Kalman/NIG/James-Stein/ADVI/
+Cornish-Fisher/GEV/Welford; latency-aware; fallbacks) — the best-of-breed calls hold. Caveats:
+- **LLM-synthesized** (source tags like `deepseek_*`) — coherent but not battle-tested; each
+  file needs a review pass before porting/trusting.
+- **Concrete bug to fix on recovery:** in `HybridSignalEngine.update_bar`, the inverse-variance
+  combine uses `alpha_shrunk` for *both* the Kalman and shrinkage precision terms — the raw
+  Kalman alpha never enters the blend. Likely a copy-paste artifact; confirm intent.
+- **Risk-layer overlap:** `risk_engine.py` (L1–L4 lanes) and `risk_intelligence.py`
+  (Cornish-Fisher VaR + adaptive-vol cadence + GEV fitting) both compute VaR/sVaR/RNIV.
+  Consolidate into one risk stack (C-F VaR + the L1–L4 lanes + the regime cadence).
+- **Edge still unvalidated** — the machinery is sound; whether the composite alpha *predicts*
+  returns is unproven (Phase 1 was that step).
+
 ## What this is
 A cross-branch review of every Blaque Baux / Crypto Quant iteration in
 `Downloads/Blaque Baux and Crypto Quant/`, to define **one canonical platform** as the
@@ -113,13 +136,27 @@ constraints worth keeping.
   per-pool budget/loss limits (REQ-RISK-003/004), loss budget → `update_pnl!`. This is exactly
   the PnL/risk feed the governed controller was built to receive but isn't yet wired.
 
-## Proposed sequence (once a language path is chosen)
-1. Stand up the **v1 fleet runtime** against the governed Julia execution (bridge) — one pool
-   (US equities), dry-run.
-2. Wire **risk_engine → governed controller gates** (the mapping above) — this is `compute_targets`'
-   risk half and the PnL feed in one move.
-3. Recover **HybridSignalEngine + cascade + qp_solver** as the alpha→weights path → `compute_targets`.
-4. Recover **borrow_feed** for the short book; **fetcher/IBKR** for the equity panel.
-5. **Validate the edge** (purged CV, module_11, on recovered data) before any live capital.
-6. Layer in **CherryPick Gamma-ARMA regime** to upgrade the signal/risk regime inputs.
-7. Port hot paths to Julia/Rust as performance requires; add crypto + other pools.
+## Path-A sequence (equity-first, IBKR data, Python↔Julia bridge)
+Target: one US-equity pool, end-to-end, paper — Python fleet+alpha+risk → bridge → the
+governed Julia `ExecutionController`. Each step is dry-run/paper until step 6.
+
+1. **IBKR data adapter.** Repurpose `data/fetcher.py` to pull 15-min bars from IBKR
+   (`reqHistoricalData`/`reqMktData`) instead of Polygon → `close_prices/returns/signal_returns`.
+   Reuses the Gateway you're already standing up.
+2. **Bridge the governed execution.** Expose the Julia `ExecutionController` to Python (a thin
+   RPC/subprocess seam, like `cuopt_bridge.py`) so the Python fleet submits governed orders.
+3. **Risk-engine → controller gates.** Wire `risk_engine`/`risk_intelligence` outputs onto the
+   governed gates: `six_sigma_halt`→`halt!`, `position_scalar`→sizing, VaR/sVaR loss→
+   `set_pool_budget!`/`set_pool_loss_limit!`, loss/PnL→`update_pnl!`. This closes `compute_targets`'
+   risk half *and* the PnL feed at once.
+4. **Alpha→weights path.** Recover `HybridSignalEngine` (fix the combine bug) + `cascade` +
+   `qp_solver` (+ `borrow_feed` for shorts) → per-symbol targets → `compute_targets`.
+5. **Validate the edge** on IBKR history via CherryPick's purged CV (module_11) — the Phase-1
+   accuracy test that was never run. **No live capital before this passes.**
+6. **Paper-live the US pool** (`BB_LIVE_EXEC=yes`) through the full stack; confirm a governed
+   daily cycle.
+7. **Consolidate the risk stack** (merge `risk_engine` + `risk_intelligence`); layer in CherryPick
+   Gamma-ARMA regime to upgrade the vol-regime inputs.
+
+**Day-2:** add pools (EMEA/APAC/commodities) via the v1 fleet runtime; add crypto (the Crypto
+Quant signal/risk lineage). **Day-3:** port hot layers to Julia (path B) / Rust (path C).
