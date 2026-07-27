@@ -49,7 +49,8 @@ connection code come first.
       `submit_governed!` rejects orders with incomplete lineage (AUDIT-002 gate). `expected`
       is now fill-driven via `process_fills!`/`apply_fill!` (F1 fixed) → `reconcile!` operational.
       Remaining: wire `process_fills!` → `record_fill` in the daily runner (integration); tests (step 6).
-      NOTE: orphan duplicate files flagged for cleanup (src/execution_ledger.jl et al.).
+      DONE: removed orphan duplicate files (src/execution_ledger.jl, cascade_feedback.jl,
+      module_10_feedback.jl, module_9_0dte.jl) — dead copies of the module_*/ dir versions.
 - [ ] **Step 4 — REQ-RISK-003 (budget gate) + REQ-RISK-004 (daily loss halt).** Per-pool
       budget check before emission; loss-limit breach halts the pool until logged human re-enable.
 - [ ] **Step 5 — REQ-GOV-002 finish.** Bounded-time halt guarantee + write halt events to
