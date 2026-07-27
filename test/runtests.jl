@@ -54,6 +54,7 @@ run_module_tests("Live Execution Integration (venue+ledger+audit)", "test_live_i
 @info "-"^50
 
 run_module_tests("End-to-End Integration", "test_integration.jl")
+run_module_tests("Spine Pipeline (cached data → governed → ledger)", "test_spine_pipeline.jl")
 
 # Stress Tests
 @info ""

@@ -51,7 +51,8 @@ function ExecutionLayer.submit!(v::SimVenue, o::VenueOrder)
 end
 
 function main(; csv = joinpath(REPO, "scripts/data/sector_panel.csv"),
-              capital = 1_000_000.0, n_rebalances = 12, step = 21, regime = :dd)
+              capital = 1_000_000.0, n_rebalances = 12, step = 21, regime = :dd,
+              verbose::Bool = true)
     tmp = mktempdir()
     venue = SimVenue()
     built = build_live_controller(; venue = venue,
@@ -68,9 +69,10 @@ function main(; csv = joinpath(REPO, "scripts/data/sector_panel.csv"),
     sel = ad[max(1, length(ad) - step * (n_rebalances - 1)):step:end]
     state = SpineState(length(provider.symbols); regime = regime)
 
-    @info "Pipeline start" symbols=provider.symbols rebalances=length(sel) span="$(first(sel)) → $(last(sel))"
-    println("\n date        regime    orders  fills  reconciled  gross\$")
-    println("-"^68)
+    verbose && @info "Pipeline start" symbols=provider.symbols rebalances=length(sel) span="$(first(sel)) → $(last(sel))"
+    verbose && println("\n date        regime    orders  fills  reconciled  gross\$")
+    verbose && println("-"^68)
+    recs = NamedTuple[]
     for asof in sel
         reset_daily!(ctrl)                                        # each rebalance = a new trading day
         feed_staleness!(ctrl, pool; stale = false)               # cached data is fresh by construction
@@ -83,9 +85,11 @@ function main(; csv = joinpath(REPO, "scripts/data/sector_panel.csv"),
             signal_id = "spine", regime = reg, solve_id = Dates.format(asof, "yyyymmdd"),
             pool_id = pool, settle_secs = 0)
         gross = sum(abs(v) * prices[k] for (k, v) in targets)
-        @printf("%s   %-8s  %5d  %5d   %-9s  %s\n", asof, reg,
-                length(res.acks), length(res.fills), string(res.reconciled),
-                string(round(Int, gross)))
+        accepted = count(a -> a.status == :accepted, res.acks)
+        push!(recs, (asof = asof, regime = reg, orders = length(res.acks), accepted = accepted,
+                     fills = length(res.fills), reconciled = res.reconciled, gross = gross))
+        verbose && @printf("%s   %-8s  %5d  %5d   %-9s  %s\n", asof, reg,
+                length(res.acks), length(res.fills), string(res.reconciled), string(round(Int, gross)))
     end
 
     # Prove the ledger captured fills WITH decision lineage (AUDIT-001).
@@ -95,13 +99,13 @@ function main(; csv = joinpath(REPO, "scripts/data/sector_panel.csv"),
         fs = query_fills(ledger, s); total += length(fs)
         sample === nothing && !isempty(fs) && (sample = fs[end])
     end
-    println("-"^68)
-    @info "Pipeline complete" ledger_fills=total
-    if sample !== nothing
-        @info "sample fill lineage (AUDIT-001)" symbol=sample.symbol qty=sample.signed_qty price=sample.fill_price signal_id=sample.signal_id regime=sample.regime solve_id=sample.solve_id order_id=sample.order_id
+    if verbose
+        println("-"^68)
+        @info "Pipeline complete" ledger_fills=total
+        sample !== nothing && @info "sample fill lineage (AUDIT-001)" symbol=sample.symbol qty=sample.signed_qty price=sample.fill_price signal_id=sample.signal_id regime=sample.regime solve_id=sample.solve_id order_id=sample.order_id
     end
     close_ledger(ledger)
-    return total
+    return (; rebalances = recs, ledger_fills = total, sample = sample)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

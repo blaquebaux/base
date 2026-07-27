@@ -100,6 +100,8 @@ governed execution path.** Only the live IBKR data/venue swap remains (blocked o
 | data (d-4) | `src/module_1_data/equity_panel.jl` (`EquityPanel`: swappable `PanelProvider`, `CSVPanelProvider`, `panel_at`) + fixture `scripts/data/sector_panel.csv` | ✅ `test/test_equity_panel.jl` **12/12** |
 | wiring | `scripts/run_daily_recursive.jl` `compute_targets` → spine → governed `execute_rebalance!`; Serialization state persistence; `spine_regime=:dd` | ✅ loads clean |
 | end-to-end | `scripts/spine_end_to_end.jl`: CSV → spine → governed orders → SimVenue fills → SQLite ledger w/ lineage → reconcile | ✅ 12 rebalances, **59 fills w/ AUDIT-001 lineage** |
+| integration test | `test/test_spine_pipeline.jl` — the full pipeline as a registered test (asserts reconcile + lineage every run) | ✅ **11/11** |
+| live adapter (write-ahead) | `src/module_1_data/ibkr_panel.jl` — `IBKRPanelProvider` (Jib `reqHistoricalData`, verified offline against the Jib v0.30 API) | ⏳ compiles; runtime awaits Gateway |
 
 **Design facts baked in (verified, not assumed):**
 - Per-sleeve vol-target uses each sleeve's **realized P&L vol** (RiskMetrics span-60), *not* ex-ante
@@ -112,10 +114,14 @@ governed execution path.** Only the live IBKR data/venue swap remains (blocked o
 - Fixed a pre-existing parse bug in `run_daily_recursive.jl` (malformed multi-line `@info`) — the
   draft runner had never parsed/loaded before.
 
-**Remaining for live paper:** swap `CSVPanelProvider → IBKRPanelProvider` (reqHistoricalData) and
-`SimVenue → IBKRVenue` — **blocked on IBKR account approval**, not on code. Everything between is
-exercised exactly as it will run live. The market-neutral L/S "Path-A sequence" below is the
-**research track**, not the spine.
+**Remaining for live paper (blocked on IBKR account approval, not on code):**
+`IBKRPanelProvider` is **written and compiles** (verified offline against the Jib API); what's
+left is *runtime* — (1) point the runner at `IBKRPanelProvider` instead of `CSVPanelProvider`
+(one line; same `panel_at` contract), (2) use `IBKRVenue` instead of `SimVenue` (already the
+`build_live_controller` default), (3) run the paper smoke test once the Gateway is up. Everything
+between the data source and the venue is exercised exactly as it will run live (proven by
+`test/test_spine_pipeline.jl`). The market-neutral L/S "Path-A sequence" below is the **research
+track**, not the spine.
 
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
