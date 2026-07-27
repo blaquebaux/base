@@ -141,18 +141,76 @@ ord(; cid, sym="AAPL", side=:buy, qty=10, pool="us", sig="s1", reg="calm", solve
         @test haskey(c.halted_pools, "us")           # scoped to the right pool
     end
 
-    @testset "I2 concurrency: no budget over-commit under parallel submit" begin
-        v = MockVenue(); v.yield_in_submit = true    # force interleaving at the submit point
-        c = ExecutionController(v); set_pool_budget!(c, "us", 1000.0)   # 10 × notional 100
-        n = 50
-        @sync for i in 1:n
-            Threads.@spawn submit_governed!(c, ord(cid="cc$i", sym="S$i", qty=1, price=100.0))
+    @testset "G3 record-then-apply fail-safe" begin
+        v = MockVenue(); c = ExecutionController(v)
+        submit_governed!(c, ord(cid="g3a", sym="AAPL", pool="us"))
+        v.fills = [(symbol="AAPL", order_id="OID1", fill_price=100.0, shares=10, side="BOT", timestamp=now(UTC))]
+        processed = process_fills!(c; record = _ -> error("ledger down"))
+        @test isempty(processed)                      # record threw → fill not counted as processed
+        @test get(c.expected, "AAPL", 0.0) == 0.0     # expected NOT updated on record failure
+        v.posns = Dict("AAPL" => 10.0)                # broker has the (unrecorded) fill
+        @test reconcile!(c) == false                  # G3: the loss surfaces as a divergence/halt
+        @test haskey(c.halted_pools, "us")
+    end
+
+    @testset "G2 rehydrate restores seen (no re-submit) and lineage (tags fills)" begin
+        v = MockVenue(); c = ExecutionController(v)
+        rehydrate!(c;
+            seen    = Dict("cid9" => OrderAck(:accepted, "OID9", "cid9", nothing)),
+            lineage = Dict("OID9" => (signal_id="s9", regime="r9", solve_id="q9", client_order_id="cid9")))
+        a = submit_governed!(c, ord(cid="cid9"))
+        @test a.venue_order_id == "OID9" && v.submits == 0   # rehydrated seen → replay, no re-submit
+        v.fills = [(symbol="AAPL", order_id="OID9", fill_price=100.0, shares=5, side="BOT", timestamp=now(UTC))]
+        p = process_fills!(c)
+        @test p[1].signal_id == "s9"                  # rehydrated lineage tagged the fill (G2/AUDIT-001)
+    end
+
+    @testset "reset_daily! clears turnover but keeps halts" begin
+        v = MockVenue(); c = ExecutionController(v); set_pool_budget!(c, "us", 200.0)
+        @test submit_governed!(c, ord(cid="rd1", qty=2, price=100.0)).status == :accepted   # uses 200
+        @test submit_governed!(c, ord(cid="rd2", sym="MSFT", qty=1, price=100.0)).status == :rejected  # over budget
+        halt_pool!(c, "us", "manual")
+        reset_daily!(c)
+        @test get(c.pool_used, "us", 0.0) == 0.0      # turnover cleared
+        @test haskey(c.halted_pools, "us")            # halt NOT auto-lifted
+        @test occursin("halted", submit_governed!(c, ord(cid="rd3", sym="GOOG", qty=1, price=100.0)).error)
+        resume_pool!(c, "us")
+        @test submit_governed!(c, ord(cid="rd4", sym="AMZN", qty=1, price=100.0)).status == :accepted  # budget freed
+    end
+
+    @testset "K4 misc: process_and_reconcile!, multi-fill, non-breach PnL" begin
+        v = MockVenue(); c = ExecutionController(v)
+        submit_governed!(c, ord(cid="pr1", sym="AAPL"))
+        v.fills = [(symbol="AAPL", order_id="OID1", fill_price=100.0, shares=10, side="BOT", timestamp=now(UTC))]
+        v.posns = Dict("AAPL" => 10.0)
+        @test process_and_reconcile!(c) == true       # applies fills then reconciles → match
+
+        v2 = MockVenue(); c2 = ExecutionController(v2)
+        submit_governed!(c2, ord(cid="mf1", sym="AAPL"))
+        v2.fills = [(symbol="AAPL", order_id="OID1", fill_price=100.0, shares=6, side="BOT", timestamp=now(UTC)),
+                    (symbol="AAPL", order_id="OID1", fill_price=100.0, shares=4, side="BOT", timestamp=now(UTC))]
+        process_fills!(c2)
+        @test c2.expected["AAPL"] == 10.0             # multiple/partial fills accumulate
+
+        v3 = MockVenue(); c3 = ExecutionController(v3); set_pool_loss_limit!(c3, "us", 1000.0)
+        update_pnl!(c3, "us", -500.0)                 # within limit → no halt
+        @test !haskey(c3.halted_pools, "us")
+        @test submit_governed!(c3, ord(cid="nb1")).status == :accepted
+    end
+
+    @testset "I2 concurrency: exact budget fill, no over/under-commit (looped)" begin
+        # Budget 1000 / notional 100 → EXACTLY 10 accepted, 40 rejected. Looping gives a rare
+        # race real chances to manifest; == (not <=) also catches spurious under-acceptance.
+        for iter in 1:100
+            v = MockVenue(); v.yield_in_submit = true
+            c = ExecutionController(v); set_pool_budget!(c, "us", 1000.0)
+            @sync for i in 1:50
+                Threads.@spawn submit_governed!(c, ord(cid="cc$(iter)_$i", sym="S$i", qty=1, price=100.0))
+            end
+            @test get(c.pool_used, "us", 0.0) == 1000.0   # fully + exactly utilized
+            @test length(c.seen) == 10                     # exact budget-fitting count (no over/under)
+            @test length(c.lineage) == 10
         end
-        used = get(c.pool_used, "us", 0.0)
-        @test used <= 1000.0 + 1e-6                   # reservation-under-lock prevents over-commit
-        @test length(c.seen) <= 10                    # budget cap held under concurrency
-        @test isapprox(used, 100.0 * length(c.seen); atol=1e-6)  # reservation consistent with accepted
-        @test length(c.lineage) == length(c.seen)     # every accepted order got a lineage entry
     end
 end
 

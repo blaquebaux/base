@@ -199,8 +199,12 @@ orders (`lineage`, G2). The caller reconstructs both from the persisted ledger; 
 reconstruction also needs broker open-orders by `orderRef` (a follow-on).
 """
 function rehydrate!(ctrl::ExecutionController;
-                    seen::Dict{String,OrderAck}   = Dict{String,OrderAck}(),
-                    lineage::Dict{String,NamedTuple} = Dict{String,NamedTuple}())
+                    seen::AbstractDict    = Dict{String,OrderAck}(),
+                    lineage::AbstractDict = Dict{String,NamedTuple}())
+    # AbstractDict (not Dict{String,NamedTuple}): a caller's naturally-built
+    # Dict("oid" => (signal_id=...,)) infers a *concrete* NamedTuple value type, which is
+    # NOT <: Dict{String,NamedTuple} under Julia's invariant typing. merge! into the
+    # controller's Dict{String,NamedTuple}/Dict{String,OrderAck} fields converts fine.
     lock(ctrl._lock) do
         merge!(ctrl.seen, seen)
         merge!(ctrl.lineage, lineage)
