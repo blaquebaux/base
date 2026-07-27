@@ -54,8 +54,13 @@ connection code come first.
       budget check before emission; loss-limit breach halts the pool until logged human re-enable.
 - [ ] **Step 5 — REQ-GOV-002 finish.** Bounded-time halt guarantee + write halt events to
       the `module_8_governance` audit log.
-- [ ] **Step 6 — tests** for the controller + IBKR adapter (closes part of the module 9–13
-      coverage cliff; verifies EXEC-001/002/003, AUDIT, RISK, GOV).
+- [x] **Step 6 — controller tests.** `test/test_execution_controller.jl` (Jib-free, mock
+      venue), **34/34 incl. a 4-thread concurrency stress test** (no budget over-commit,
+      cap held, reservation/lineage consistent, no deadlock — verifies I2). Wired into
+      `runtests.jl`; the 9 controller REQ rows in design.md now cite it. Verifies the
+      *controller logic* for EXEC-001/002/003, AUDIT-001/002, RISK-003/004, DATA-003,
+      GOV-002. NOT covered (needs a paper Gateway, #4): the IBKR adapter's Jib calls and the
+      runner integration (PnL/staleness/fills/audit/ledger wiring).
 - [ ] **REQ-DATA-002** — Import-graph check: exec modules 7/12 must not `include`/`using`
       research modules (`module_13` backtest). Whitelist the `module_12 → cuopt_bridge.py`
       HTTP solver seam. (Julia-internal scope confirmed — see design.md Entrypoints.)

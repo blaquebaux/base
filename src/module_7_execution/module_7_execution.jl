@@ -14,7 +14,7 @@ export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        apply_fill!, process_fills!, process_and_reconcile!,
        set_pool_budget!, set_pool_loss_limit!, update_pnl!,
        halt_pool!, resume_pool!, reset_daily!,
-       set_pool_staleness!, mark_data_fresh!, set_audit_sink!
+       set_pool_staleness!, mark_data_fresh!, set_audit_sink!, rebind_symbol!
 
 # ============================================================================
 # Order Types and Structures

@@ -70,11 +70,13 @@ src/module_7_execution/
   submit!/positions, ledger record, audit sink), so the kill switch can't be blocked by an
   in-flight order (preserves GOV-002 bounded time). Submission is reserve→submit→finalize:
   budget reserved under the lock, network submit lock-free, then confirm or roll back.
-- **Verified by execution:** the controller logic (all gates, idempotency, reserve/rollback,
-  per-pool halt/loss/staleness, reconcile, I1 audit robustness) passes a **30/30 mock-venue
-  smoke test** — the first runtime verification in this build. The IBKR *adapter* (Jib) and
-  the runner integration remain unverified until a paper Gateway (#4); the formal in-repo
-  test suite is step 6.
+- **Verified by execution (step 6):** the controller logic passes a committed, re-runnable
+  suite — `test/test_execution_controller.jl`, **34/34 including a 4-thread concurrency
+  stress test** (no budget over-commit, cap held, reservation/lineage consistent, no
+  deadlock). Self-contained and Jib-free (mock venue), wired into `runtests.jl`. Covers all
+  order-path gates, idempotency incl. the uncertain path, reserve/rollback, per-pool
+  halt/loss/staleness, reconcile, and I1 audit robustness. Still unverified: the IBKR
+  *adapter*'s Jib calls and the runner integration, until a paper Gateway (#4).
 
 ## Enforcement tiers
 **static** (build/CI rule) · **runtime** (assert/guard raises) · **test** (suite assertion) · **manual**
@@ -94,37 +96,40 @@ src/module_7_execution/
 | REQ-SIM-003 | `module_11_cv` (purged K-Fold/CPCV) | `test_backtest_integrity.jl`, `scripts/backtest_validation.jl` | test | holds — purged K-Fold/CPCV removes cross-fold label leakage (López de Prado); MAE stored to governance computed on clean folds. *(This is the requirement the purged-CV mechanism was actually satisfying — previously credited to REQ-SIM-001 by mistake.)* |
 | REQ-RISK-001 | `module_13_portfolio` (PortfolioOpt), `module_6_cascade` (parallel pools) | `test_module_6.jl`, `test_stress.jl` | design + test | unknown — parallel-pool implementation present; verify no concurrent solves against one pool's budget. |
 | REQ-RISK-002 | `module_13_portfolio` (`costaware`, `robust`), `module_10_feedback` | *(none — module 13 untested)* | test + runtime | unknown — reject/zero-with-named-reason not confirmed; **module 13 has no unit test.** |
-| REQ-RISK-003 | `execution_controller.jl` (`submit_governed!` budget gate, `set_pool_budget!`), `module_6_cascade` (sizing) | *(none — step 6)* | runtime (gate) | partial — **step 4:** per-pool daily gross-notional budget enforced at the controller gate *before* emission (rejects on breach; rejects if a budgeted pool's order has no price to size against). Model is turnover-based (daily gross notional); a net-exposure model can replace it. Test pending. |
-| REQ-EXEC-001 | `venues/ibkr.jl` (`submit!`), `ibkr_connection.jl` (`reserve_and_place`), `execution_controller.jl` | *(test pending — step 6)* | runtime (lock) + test | partial — **step 1 done:** venue interface + real IBKR adapter built; submission serialized + order-id allocation atomic under one lock (`reserve_and_place`). Legacy simulated `send_order` retained. Serial-*per-pool* (vs per-connection) + test still open. |
-| REQ-AUDIT-001 | `module_10_feedback/execution_ledger.jl` (`FillRecord` + schema/migration), `execution_controller.jl` (`process_fills!` supplies lineage) | *(none — module 10 untested, step 6)* | runtime (write-path assert) | partial — **step 3:** the VIOLATION is fixed. `FillRecord` now has `signal_id/regime/solve_id/order_id`; the write-path constructor **rejects empty lineage**, so a lineage-less fill is structurally unrecordable. Remaining: wire `process_fills!` output → `record_fill` in the daily runner (integration) + test. |
-| REQ-AUDIT-002 | `execution_controller.jl` (`submit_governed!` gate) | *(none — step 6)* | runtime (reject on incomplete lineage) | partial — **step 3:** gate implemented — an order missing `signal_id/regime/solve_id` is rejected (`:rejected`) at the controller, never sent. Test pending. |
+| REQ-RISK-003 | `execution_controller.jl` (`submit_governed!` budget gate, `set_pool_budget!`), `module_6_cascade` (sizing) | test_execution_controller.jl | runtime (gate) | partial — **step 4:** per-pool daily gross-notional budget enforced at the controller gate *before* emission (rejects on breach; rejects if a budgeted pool's order has no price to size against). Model is turnover-based (daily gross notional); a net-exposure model can replace it. Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
+| REQ-EXEC-001 | `venues/ibkr.jl` (`submit!`), `ibkr_connection.jl` (`reserve_and_place`), `execution_controller.jl` | test_execution_controller.jl | runtime (lock) + test | partial — **step 1 done:** venue interface + real IBKR adapter built; submission serialized + order-id allocation atomic under one lock (`reserve_and_place`). Legacy simulated `send_order` retained. Serial-*per-pool* (vs per-connection) + serial-per-pool holds; adapter+integration pending (logic tested). |
+| REQ-AUDIT-001 | `module_10_feedback/execution_ledger.jl` (`FillRecord` + schema/migration), `execution_controller.jl` (`process_fills!` supplies lineage) | test_execution_controller.jl | runtime (write-path assert) | partial — **step 3:** the VIOLATION is fixed. `FillRecord` now has `signal_id/regime/solve_id/order_id`; the write-path constructor **rejects empty lineage**, so a lineage-less fill is structurally unrecordable. Remaining: wire `process_fills!` output → `record_fill` in the daily runner (integration) + test. |
+| REQ-AUDIT-002 | `execution_controller.jl` (`submit_governed!` gate) | test_execution_controller.jl | runtime (reject on incomplete lineage) | partial — **step 3:** gate implemented — an order missing `signal_id/regime/solve_id` is rejected (`:rejected`) at the controller, never sent. Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
 | REQ-REGIME-001 | `module_4_arma`, `module_5_dpm`, `module_6_cascade`; logging via `module_8_governance` | `test_module_4/5/6.jl` | runtime | holds (impl) — regime machinery is the system core and is tested. Confirm every transition is written to the governance audit log. |
 | REQ-GOV-001 | `module_8_governance` (SQLite version registry, JLD2 serialize/rollback) | `test_module_8.jl` | runtime | holds — version registry + serialize/deserialize + rollback implemented and tested. |
-| REQ-DATA-003 *(live-capital)* | `execution_controller.jl` (`set_pool_staleness!`, `mark_data_fresh!`, gate), `module_1_data` (detection) | *(none — step 6)* | runtime (block on stale) | partial — **step 5:** gate blocks emission for a pool whose feed is older than its threshold (transient — auto-recovers when fresh data is marked; if never marked, treated as stale). The engine calls `mark_data_fresh!` from module_1; that wiring is integration. Test pending. |
-| REQ-RISK-004 *(live-capital)* | `execution_controller.jl` (`update_pnl!`, `halt_pool!`, `resume_pool!`, `set_pool_loss_limit!`) | *(none — step 6)* | runtime (loss halt) | partial — **step 4:** per-pool daily loss limit implemented — `update_pnl!` halts a pool on breach; the pool stays halted (gate rejects its orders) until an explicit, logged `resume_pool!` (a new day via `reset_daily!` does NOT auto-lift). PnL is engine-supplied (controller can't compute cost basis). Test pending. |
-| REQ-EXEC-002 *(live-capital)* | `execution_controller.jl` (`submit_governed!`, `rehydrate!`), `venues/ibkr.jl` (`orderRef`) | *(none — step 6)* | runtime (idempotency key) | partial — **step 2:** in-process dedup on `client_order_id` (replay returns prior ack, no re-submit); key stamped as IBKR `orderRef` so the broker carries it. Cross-restart idempotency needs `rehydrate!` fed from the persisted ledger (step 3). |
-| REQ-EXEC-003 *(live-capital)* | `execution_controller.jl` (`reconcile!`, `process_fills!`, `apply_fill!`), `venues/ibkr.jl` (`positions`, `drain_fills`) | *(none — step 6)* | runtime (reconcile + halt) | partial — **step 2 + 3 (F1 fixed):** `expected` is now driven from actual FILLS (`process_fills!`/`apply_fill!`), not submitted orders, so `reconcile!` no longer false-halts on working/partial orders — it is now operational. **Step 4:** halt is now per-pool (a diverging symbol halts its own pool via `symbol_pool`; an unattributable symbol triggers a fail-safe controller-wide halt). Test pending. |
-| REQ-GOV-002 *(live-capital)* | `execution_controller.jl` (`halt!`/`resume!`/`halt_pool!`/`resume_pool!`, `audit` sink), `module_8_governance` | *(none — step 6)* | runtime (bounded-time halt) | partial — **step 5:** kill switch enforced (checked synchronously in `submit_governed!`; bounded to ≤1 in-flight order via the venue lock). All halt/resume events go to an `audit` sink; the runner wires it to the module_8 governance log (that wiring is integration). Test pending. |
+| REQ-DATA-003 *(live-capital)* | `execution_controller.jl` (`set_pool_staleness!`, `mark_data_fresh!`, gate), `module_1_data` (detection) | test_execution_controller.jl | runtime (block on stale) | partial — **step 5:** gate blocks emission for a pool whose feed is older than its threshold (transient — auto-recovers when fresh data is marked; if never marked, treated as stale). The engine calls `mark_data_fresh!` from module_1; that wiring is integration. Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
+| REQ-RISK-004 *(live-capital)* | `execution_controller.jl` (`update_pnl!`, `halt_pool!`, `resume_pool!`, `set_pool_loss_limit!`) | test_execution_controller.jl | runtime (loss halt) | partial — **step 4:** per-pool daily loss limit implemented — `update_pnl!` halts a pool on breach; the pool stays halted (gate rejects its orders) until an explicit, logged `resume_pool!` (a new day via `reset_daily!` does NOT auto-lift). PnL is engine-supplied (controller can't compute cost basis). Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
+| REQ-EXEC-002 *(live-capital)* | `execution_controller.jl` (`submit_governed!`, `rehydrate!`), `venues/ibkr.jl` (`orderRef`) | test_execution_controller.jl | runtime (idempotency key) | partial — **step 2:** in-process dedup on `client_order_id` (replay returns prior ack, no re-submit); key stamped as IBKR `orderRef` so the broker carries it. Cross-restart idempotency needs `rehydrate!` fed from the persisted ledger (step 3). |
+| REQ-EXEC-003 *(live-capital)* | `execution_controller.jl` (`reconcile!`, `process_fills!`, `apply_fill!`), `venues/ibkr.jl` (`positions`, `drain_fills`) | test_execution_controller.jl | runtime (reconcile + halt) | partial — **step 2 + 3 (F1 fixed):** `expected` is now driven from actual FILLS (`process_fills!`/`apply_fill!`), not submitted orders, so `reconcile!` no longer false-halts on working/partial orders — it is now operational. **Step 4:** halt is now per-pool (a diverging symbol halts its own pool via `symbol_pool`; an unattributable symbol triggers a fail-safe controller-wide halt). Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
+| REQ-GOV-002 *(live-capital)* | `execution_controller.jl` (`halt!`/`resume!`/`halt_pool!`/`resume_pool!`, `audit` sink), `module_8_governance` | test_execution_controller.jl | runtime (bounded-time halt) | partial — **step 5:** kill switch enforced (checked synchronously in `submit_governed!`; bounded to ≤1 in-flight order via the venue lock). All halt/resume events go to an `audit` sink; the runner wires it to the module_8 governance log (that wiring is integration). Logic tested (test_execution_controller.jl, incl. concurrency); adapter+integration pending. |
 
 ## Test coverage map (existing suite → strata)
 
-- **Module unit tests:** `test_module_1..8.jl` — modules **1–8 covered; 9–13 have no dedicated unit test.**
-- **Strata:** `test_stratum_i.jl`, `test_stratum_ii.jl` (structural + computational strata).
+- **Module unit tests:** `test_module_1..8.jl` — modules 1–8 covered.
+- **Governed execution path:** `test_execution_controller.jl` — 34/34, Jib-free (mock venue),
+  incl. a 4-thread concurrency stress test. Covers the controller invariants (EXEC-001/002/003,
+  AUDIT-001/002, RISK-003/004, DATA-003, GOV-002).
+- **Strata:** `test_stratum_i.jl`, `test_stratum_ii.jl`.
 - **Integrity/risk:** `test_backtest_integrity.jl`, `test_stress.jl`, `test_stress_scenarios.jl`, `test_integration.jl`, `test_geometric_consistency.jl`.
 
-## Coverage gap (the real Phase-2 backlog)
+## Coverage gap (the remaining backlog)
 
-The invariants most at risk are the ones landing in **untested modules 9–13**:
-REQ-AUDIT-001 (mod 10), REQ-RISK-001/002 (mod 13), execution/SOR (mod 12), 0DTE (mod 9).
-These are the newest modules (Deepseek-v2 additions and extensions) and carry no unit
-tests. Coverage here is prioritized over the already-tested regime/data modules.
+The live-capital invariants (EXEC-001/002/003, AUDIT-001/002, RISK-003/004, DATA-003,
+GOV-002) are now **implemented and their controller logic is tested** (`test_execution_controller.jl`).
+What remains for each is the **live path**: the IBKR adapter's Jib calls (#4) and the runner
+integration (feed PnL via `update_pnl!`, feed staleness via `mark_data_fresh!`, wire the
+`audit` sink → module_8, wire `process_fills!` → `record_fill`, rehydrate on startup) — all
+provable only against a paper Gateway.
 
-**Live-capital invariants (REQ-DATA-003, REQ-RISK-004, REQ-EXEC-002/003, REQ-GOV-002)**
-are mostly `unimplemented` or `partial`. Two must be designed *into* the coming `Jib.jl`
-execution work rather than retrofitted: **REQ-EXEC-002 (idempotency)** — the reconnect
-loop is where duplicate orders are born, so idempotency keys have to exist before the
-real broker path goes live — and **REQ-EXEC-003 (reconciliation)**. These are the reason
-the `send_order` replacement is not a drop-in.
+Still genuinely uncovered — the **module 9–13 internals** (not the controller): REQ-RISK-001/002
+(mod 13 concurrency / reject-reasons), SOR (mod 12), 0DTE (mod 9). And the non-controller REQs:
+REQ-SIM-001 (runtime clock chokepoint), REQ-SIM-002 (per-venue bar semantics), REQ-DATA-001/002
+(import-boundary lint).
 
 ## Known limitations carried from CHERRY_PICK_NOTES.md (authoritative gap list)
 

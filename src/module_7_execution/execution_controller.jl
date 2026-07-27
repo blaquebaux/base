@@ -85,6 +85,17 @@ set_pool_staleness!(ctrl::ExecutionController, pool_id::String, max_age::Period)
 mark_data_fresh!(ctrl::ExecutionController, pool_id::String; ts::DateTime = now(UTC)) =
     (lock(() -> (ctrl.pool_data_ts[pool_id] = ts), ctrl._lock); nothing)
 
+"""
+    rebind_symbol!(ctrl, symbol, pool_id)
+
+Admin override for the durable symbol→pool assignment (H1/J2). A symbol's home pool is set
+on its first submission and is intentionally sticky (durable, concurrency-safe). Use this to
+correct a mistaken binding — e.g. a symbol first submitted under the wrong pool. Only safe
+when no order for `symbol` is in flight.
+"""
+rebind_symbol!(ctrl::ExecutionController, symbol::String, pool_id::String) =
+    (lock(() -> (ctrl.symbol_pool[symbol] = pool_id), ctrl._lock); nothing)
+
 # ── Kill switch (REQ-GOV-002) ──────────────────────────────────────────────────
 
 """
@@ -290,7 +301,11 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
                 )
             end
         else
-            # Clean :rejected by the venue — release the budget reservation.
+            # Clean :rejected by the venue — release the budget reservation (a transient
+            # daily counter). J2: the symbol_pool binding is NOT rolled back — it is a
+            # DURABLE assignment (a symbol's home pool), not a per-order reservation, and
+            # rolling it back would be unsafe under concurrency (a parallel same-symbol order
+            # may already rely on it). Use rebind_symbol! to correct a mistaken binding.
             ctrl.pool_used[o.pool_id] = get(ctrl.pool_used, o.pool_id, 0.0) - notional
         end
     end
