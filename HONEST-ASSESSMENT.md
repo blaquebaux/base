@@ -18,11 +18,11 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
   referenced but not wired. No real capital has been routed by this codebase.
 - **The live-capital invariants now have enforcement logic (controller-verified), but the
   live path is not proven.** [verified 2026-07-26] EXEC-001/002/003, RISK-003/004,
-  DATA-003, GOV-002, AUDIT-001/002 are all implemented in the governed controller and pass
-  the 30/30 smoke test. What is NOT yet proven: the IBKR adapter's Jib calls (#4), the
-  runner integration that feeds PnL/staleness/fills and wires the audit + ledger, and a
-  formal in-repo test suite (step 6). **The headline risk is now integration + adapter
-  verification, not missing controls.**
+  DATA-003, GOV-002, AUDIT-001/002 are all implemented in the governed controller and pass a
+  committed 34/34 test suite (`test/test_execution_controller.jl`), including a 4-thread
+  concurrency stress test. What is NOT yet proven: the IBKR adapter's Jib calls (#4) and the
+  runner integration that feeds PnL/staleness/fills and wires the audit + ledger. **The
+  headline risk is now integration + adapter verification, not missing controls.**
 - **Data feeds are partially real.** [asserted, per CHERRY_PICK_NOTES] Cboe/FRED/Deribit/
   TGA endpoints wired (Deepseek-v2); but OIS-SOFR is a 5bps placeholder and GSW zero-coupon
   yields require a manual Fed download (FRED DGS = par yields, not zero). Treat any curve-
@@ -38,7 +38,8 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
 - **Execution controller logic is runtime-verified** [verified 2026-07-26] — the
   venue-agnostic governed controller (all order-path gates, idempotency incl. the uncertain
   path, budget reserve/rollback, per-pool loss/staleness halts, per-pool reconciliation,
-  concurrency lock, audit-sink robustness) passes a 30/30 mock-venue smoke test. This is
+  concurrency lock, audit-sink robustness) passes a committed 34/34 suite
+  (`test/test_execution_controller.jl`) including a 4-thread concurrency stress test. This is
   logic-level verification only: the IBKR adapter (Jib TWS calls) and end-to-end
   integration remain [unknown] until run against a paper Gateway.
 - **CV methodology is sound** [verified] — purged K-Fold prevents the fold-leakage that
@@ -56,9 +57,10 @@ date), **[asserted]** (documented but not independently verified), or **[unknown
 - **unimplemented / unknown:** SIM-001 (runtime clock chokepoint), SIM-002 (per-venue bar
   semantics), DATA-001/002 (import-boundary lint), RISK-001/002 (module 13 concurrency /
   reject-reasons).
-- **Test coverage cliff:** modules 1–8 tested (~650 cases); modules 9–13 still have no
-  in-repo unit tests (module 10 now carries lineage; the controller has a scratchpad smoke
-  test to be formalized in step 6).
+- **Test coverage:** modules 1–8 tested (~650 cases) + the governed execution controller
+  (34/34, `test_execution_controller.jl`). Still untested: the module 9–13 *internals*
+  (module 10 ledger SQLite, 11 CV, 12 SOR, 13 portfolio/risk) — the controller test uses a
+  mock venue and does not exercise them.
 
 ## What this means for VC / allocator conversations
 
