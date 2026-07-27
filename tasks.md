@@ -95,6 +95,23 @@ fleet machine — not a repo clone. The governed controller above is built once.
       by a 30/30 mock-venue smoke test** (scratchpad `smoke_controller.jl`) — first runtime
       verification; formalize into `test/` as step 6.
 
+## Phase 3 — integration + paper Gateway (live path)
+
+- [x] **Jib adapter API verified offline (#4 mostly closed).** Loaded ExecutionLayer against
+      real Jib (v0.31); found + fixed 6 bugs (wrapper type, reqIds arity, error arity,
+      cancelOrder OrderCancel, reqMktData arg, connectionClosed invalid callback). Module now
+      loads and Jib.Wrapper constructs.
+- [x] **Paper smoke test + runbook.** `scripts/ibkr_paper_smoke.jl` (paper-guarded; drives
+      connect → submit_governed! → process_fills! → reconcile!) and `docs/PAPER_GATEWAY_RUNBOOK.md`.
+- [ ] **USER: run the paper smoke test** against a live IB Gateway paper session (only you can —
+      needs Gateway + paper login). Confirms runtime connect/place/fill. Closes #4.
+- [ ] **Runner integration (gated on smoke passing).** Wire `run_daily_recursive.jl` execution
+      step through `submit_governed!`/`IBKRVenue`; feed staleness (`mark_data_fresh!`) + PnL
+      (`update_pnl!`); connect `process_fills!` → ledger `record_fill` and `audit` sink →
+      module_8. Note: the runner's sizing→per-symbol-quantity step is currently a placeholder.
+- [ ] **Connection-drop detection** — wire via Jib's actual mechanism (reader Task end / conn
+      state); Jib has no `connectionClosed` callback.
+
 ## P2 — cover the untested modules 9–13 (the coverage cliff)
 
 - [ ] **module_10_feedback** — unit tests for `ExecutionLedger`/`FillRecord`
