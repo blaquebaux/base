@@ -70,7 +70,7 @@ function cancel!(v::IBKRVenue, venue_order_id::String)::Bool
     v.conn.is_connected || return false
     lock(v.conn._lock) do
         try
-            Jib.Requests.cancelOrder(v.conn.conn, parse(Int, venue_order_id))
+            Jib.Requests.cancelOrder(v.conn.conn, parse(Int, venue_order_id), Jib.OrderCancel())
             return true
         catch e
             @warn "cancel! failed" venue_order_id=venue_order_id exception=e

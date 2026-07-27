@@ -75,8 +75,16 @@ src/module_7_execution/
   stress test** (no budget over-commit, cap held, reservation/lineage consistent, no
   deadlock). Self-contained and Jib-free (mock venue), wired into `runtests.jl`. Covers all
   order-path gates, idempotency incl. the uncertain path, reserve/rollback, per-pool
-  halt/loss/staleness, reconcile, and I1 audit robustness. Still unverified: the IBKR
-  *adapter*'s Jib calls and the runner integration, until a paper Gateway (#4).
+  halt/loss/staleness, reconcile, and I1 audit robustness.
+- **IBKR adapter — API verified offline (#4 substantially closed):** loaded `ExecutionLayer`
+  against real Jib (v0.31) and introspected the API. Fixed **6 bugs** the check found, each of
+  which would have failed a live connection: (A) `start_reader` needs a `Jib.Wrapper`, not a
+  NamedTuple; (B) `reqIds(conn)` takes no count arg; (C) the `error` callback is 5-arg
+  (`errorTime`) — the 2104/2106 info msgs fire on every connect, so a wrong arity crashes the
+  reader instantly; (D) `cancelOrder` needs a `Jib.OrderCancel`; (E) `reqMktData`'s options arg
+  is a NamedTuple; (F) `connectionClosed` isn't a valid Jib callback. The module now loads and
+  the `Jib.Wrapper` constructs cleanly. **Still needs a paper Gateway:** actual connect,
+  order placement, and callback *behavior* at runtime; plus the runner integration.
 
 ## Enforcement tiers
 **static** (build/CI rule) · **runtime** (assert/guard raises) · **test** (suite assertion) · **manual**

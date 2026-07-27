@@ -63,7 +63,9 @@ nextValidId → order id; orderStatus → log; position → positions dict;
 execDetails → pending_fills channel. Other callbacks are ignored.
 """
 function _build_wrapper(ibkr::IBKRConnection)
-    return (
+    # Jib.start_reader expects a Jib.Wrapper (a validated Dict{Symbol,Function}), NOT a raw
+    # NamedTuple. Callback names + arg-lists verified against Jib source (v0.31 API).
+    return Jib.Wrapper(;
         nextValidId = (orderId::Int) -> begin
             lock(ibkr._lock) do
                 ibkr.next_order_id = orderId
@@ -83,7 +85,7 @@ function _build_wrapper(ibkr::IBKRConnection)
             @info "IBKR position" symbol=contract.symbol pos=pos avgCost=avgCost
         end,
 
-        positionEnd = () -> @info "IBKR positionEnd — snapshot complete",
+        positionEnd = () -> (@info "IBKR positionEnd — snapshot complete"),
 
         execDetails = (reqId, contract, execution) -> begin
             fill_record = (
@@ -104,20 +106,19 @@ function _build_wrapper(ibkr::IBKRConnection)
             @info "IBKR execDetails" symbol=contract.symbol price=execution.price shares=execution.shares side=execution.side
         end,
 
-        error = (id, errorCode, errorString, advancedOrderRejectJson) -> begin
+        # Jib error signature is 5-arg: (id, errorTime, errorCode, errorString, advancedOrderRejectJson).
+        # The 2104/2106/2158 info messages fire on every connect, so a wrong arity crashes the reader immediately.
+        error = (id, errorTime, errorCode, errorString, advancedOrderRejectJson) -> begin
             if errorCode in (2104, 2106, 2158, 2119)
                 @debug "IBKR info" code=errorCode msg=errorString   # informational, not errors
             else
                 @warn "IBKR error" id=id code=errorCode msg=errorString
             end
         end,
-
-        connectionClosed = () -> begin
-            lock(ibkr._lock) do
-                ibkr.is_connected = false
-            end
-            @warn "IBKR connection closed"
-        end
+        # NOTE: Jib (v0.31) does not expose a `connectionClosed` wrapper callback (it's not in
+        # its valid-callback set), so connection-drop must be detected another way — e.g. the
+        # reader Task terminating, or polling Jib's connection state. Wire this during the
+        # paper-Gateway integration; until then `is_connected` is flipped only by disconnect_ibkr.
     )
 end
 
@@ -149,7 +150,7 @@ function connect_ibkr(ibkr::IBKRConnection)::Bool
                 ibkr.is_connected = true
             end
 
-            Jib.Requests.reqIds(conn, 1)        # → next_order_id via callback
+            Jib.Requests.reqIds(conn)           # → next_order_id via nextValidId callback (takes only the connection)
             Jib.Requests.reqPositions(conn)     # → initial position snapshot
 
             @info "Connected to IBKR" host=cfg.host port=cfg.port client_id=cfg.client_id attempt=attempt
@@ -281,7 +282,9 @@ function ibkr_req_mkt_data(
     contract.exchange = "SMART"
     contract.currency = "USD"
 
-    Jib.Requests.reqMktData(ibkr.conn, req_id, contract, tick_list, false, false, [])
+    # 6-arg form (snapshot=false, regulatorySnapshot=false); the optional 7th arg must be a
+    # NamedTuple of mktDataOptions, not a Vector.
+    Jib.Requests.reqMktData(ibkr.conn, req_id, contract, tick_list, false, false)
     @info "reqMktData sent" symbol=symbol reqId=req_id tick_list=tick_list
     return req_id
 end
