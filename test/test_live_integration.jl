@@ -74,4 +74,54 @@ ExecutionLayer.drain_fills(v::MockVenue) = lock(v._lk) do; fs = copy(v.fills); e
     close_ledger(ledger)
 end
 
+@testset "emergency flatten bypasses halt (L1)" begin
+    tmp = mktempdir()
+    venue = MockVenue()
+    built = build_live_controller(; venue = venue,
+        ledger_config = LedgerConfig(; db_path = joinpath(tmp, "l.sqlite")),
+        audit_path = joinpath(tmp, "a.jsonl"))
+    ctrl, ledger = built.ctrl, built.ledger
+    set_pool_budget!(ctrl, "us", 1_000_000.0)
+
+    # Establish +10 AAPL.
+    venue.fills = [(symbol="AAPL", order_id="OID1", exec_id="EX1", fill_price=100.0, shares=10, side="BOT", timestamp=now(UTC))]
+    venue.posns = Dict("AAPL" => 10.0)
+    execute_rebalance!(ctrl, ledger; targets = Dict("AAPL" => 10.0), prices = Dict("AAPL" => 100.0),
+        signal_id = "s", regime = "calm", solve_id = "A", pool_id = "us", settle_secs = 0)
+    @test expected_position(ctrl, "AAPL") == 10.0
+
+    # Emergency: halt, then flatten. Liquidation must succeed DESPITE the halt.
+    halt!(ctrl, "emergency")
+    @test ctrl.halted == true
+    venue.fills = [(symbol="AAPL", order_id="OID2", exec_id="EX2", fill_price=99.0, shares=10, side="SLD", timestamp=now(UTC))]
+    venue.posns = Dict("AAPL" => 0.0)
+    liq = flatten!(ctrl, ledger; signal_id = "emergency", regime = "calm", solve_id = "A", settle_secs = 0)
+    @test length(liq) == 1 && liq[1].status == :accepted     # accepted despite the halt (bypass)
+    @test expected_position(ctrl, "AAPL") == 0.0             # book flattened
+
+    # A NORMAL order is still blocked by the halt.
+    normal = submit_governed!(ctrl, VenueOrder(; client_order_id = "n1", symbol = "MSFT", side = :buy,
+                 quantity = 1, order_type = :market, ref_price = 100.0, pool_id = "us",
+                 signal_id = "s", regime = "calm", solve_id = "A"))
+    @test normal.status == :rejected
+    close_ledger(ledger)
+end
+
+@testset "staleness gate blocks emission (feed_staleness stale=true)" begin
+    tmp = mktempdir()
+    venue = MockVenue()
+    built = build_live_controller(; venue = venue,
+        ledger_config = LedgerConfig(; db_path = joinpath(tmp, "l.sqlite")),
+        audit_path = joinpath(tmp, "a.jsonl"))
+    ctrl, ledger = built.ctrl, built.ledger
+    set_pool_budget!(ctrl, "us", 1_000_000.0)
+    set_pool_staleness!(ctrl, "us", Second(60))
+    feed_staleness!(ctrl, "us"; stale = true)   # NOT marked fresh → stale
+    res = execute_rebalance!(ctrl, ledger; targets = Dict("AAPL" => 10.0), prices = Dict("AAPL" => 100.0),
+        signal_id = "s", regime = "calm", solve_id = "A", pool_id = "us", settle_secs = 0)
+    @test !isempty(res.acks) && all(a -> a.status == :rejected, res.acks)
+    @test occursin("DATA-003", res.acks[1].error)
+    close_ledger(ledger)
+end
+
 end  # module

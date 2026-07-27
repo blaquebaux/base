@@ -225,19 +225,23 @@ The single governed submission path. Checks (idempotency → global kill → lin
 AUDIT-002 → disjoint-symbol → per-pool halt → staleness DATA-003 → budget RISK-003) and the
 budget reservation run atomically under the lock; the network submit runs lock-free; then
 the reservation is confirmed (accepted/uncertain) or rolled back (rejected) under the lock.
+
+`liquidation=true` (via `submit_liquidation!`) is a risk-REDUCING emission: it bypasses the
+kill switch, per-pool halt, staleness, and budget gates — you must be able to flatten even
+when halted / over budget / on stale data — but STILL enforces idempotency and lineage.
 """
-function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
+function submit_governed!(ctrl::ExecutionController, o::VenueOrder; liquidation::Bool=false)::OrderAck
     # Phase 1 — checks + reservation, atomic under the lock (NO I/O).
     # Returns (ack, _) to short-circuit, or (nothing, notional) to proceed.
     decision = lock(ctrl._lock) do
         # REQ-EXEC-002 — idempotency first: a replay returns its prior ack, never re-submits.
         haskey(ctrl.seen, o.client_order_id) && return (ctrl.seen[o.client_order_id], 0.0)
 
-        # REQ-GOV-002 — global kill switch.
-        ctrl.halted && return (OrderAck(:rejected, "", o.client_order_id,
+        # REQ-GOV-002 — global kill switch (bypassed for risk-reducing liquidation).
+        !liquidation && ctrl.halted && return (OrderAck(:rejected, "", o.client_order_id,
                                         "HALTED (REQ-GOV-002): $(ctrl.halt_reason)"), 0.0)
 
-        # REQ-AUDIT-002 — lineage is a precondition of emission.
+        # REQ-AUDIT-002 — lineage is a precondition of emission (always, even liquidation).
         ml = [nm for (nm, v) in (("signal_id", o.signal_id), ("regime", o.regime),
                                  ("solve_id", o.solve_id)) if v === nothing || isempty(v)]
         isempty(ml) || return (OrderAck(:rejected, "", o.client_order_id,
@@ -249,13 +253,13 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
                              "REJECTED: symbol $(o.symbol) already assigned to pool " *
                              "$(ctrl.symbol_pool[o.symbol]); cross-pool symbol reuse is unsupported."), 0.0)
 
-        # REQ-RISK-004 — per-pool halt.
-        haskey(ctrl.halted_pools, o.pool_id) &&
+        # REQ-RISK-004 — per-pool halt (bypassed for liquidation).
+        !liquidation && haskey(ctrl.halted_pools, o.pool_id) &&
             return (OrderAck(:rejected, "", o.client_order_id,
                              "REJECTED: pool $(o.pool_id) halted — $(ctrl.halted_pools[o.pool_id])"), 0.0)
 
-        # REQ-DATA-003 — stale-feed gate (transient; recovers on mark_data_fresh!).
-        if haskey(ctrl.pool_max_staleness, o.pool_id)
+        # REQ-DATA-003 — stale-feed gate (bypassed for liquidation).
+        if !liquidation && haskey(ctrl.pool_max_staleness, o.pool_id)
             age = now(UTC) - get(ctrl.pool_data_ts, o.pool_id, DateTime(0))
             age > ctrl.pool_max_staleness[o.pool_id] &&
                 return (OrderAck(:rejected, "", o.client_order_id,
@@ -263,9 +267,9 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
                                  "age $(age) > $(ctrl.pool_max_staleness[o.pool_id])"), 0.0)
         end
 
-        # REQ-RISK-003 — per-pool daily gross-notional budget.
+        # REQ-RISK-003 — per-pool daily gross-notional budget (bypassed for liquidation).
         notional = 0.0
-        if haskey(ctrl.pool_budgets, o.pool_id)
+        if !liquidation && haskey(ctrl.pool_budgets, o.pool_id)
             price = _gate_price(o)
             price === nothing &&
                 return (OrderAck(:rejected, "", o.client_order_id,
@@ -315,6 +319,31 @@ function submit_governed!(ctrl::ExecutionController, o::VenueOrder)::OrderAck
     end
     return ack
 end
+
+"""
+    submit_liquidation!(ctrl, o) -> OrderAck
+
+Risk-REDUCING emission for emergency flattening. Bypasses the kill switch, per-pool halt,
+staleness, and budget gates (you must be able to close positions even when halted / over
+budget / on stale data) while still enforcing idempotency and lineage. Use only to reduce
+exposure toward zero.
+"""
+submit_liquidation!(ctrl::ExecutionController, o::VenueOrder)::OrderAck =
+    submit_governed!(ctrl, o; liquidation = true)
+
+# ── Locked state accessors (use these instead of reaching into controller fields — L2) ──
+
+"Current fill-driven position for a symbol (locked read)."
+expected_position(ctrl::ExecutionController, symbol::String)::Float64 =
+    lock(() -> get(ctrl.expected, symbol, 0.0), ctrl._lock)
+
+"Snapshot copy of all fill-driven positions (locked read)."
+positions_snapshot(ctrl::ExecutionController)::Dict{String,Float64} =
+    lock(() -> copy(ctrl.expected), ctrl._lock)
+
+"The pool a symbol is bound to, or `default` if unbound (locked read)."
+pool_of(ctrl::ExecutionController, symbol::String, default::String="")::String =
+    lock(() -> get(ctrl.symbol_pool, symbol, default), ctrl._lock)
 
 # ── Fill processing (F1: expected is FILL-driven, not order-driven) ────────────
 

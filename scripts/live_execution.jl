@@ -21,7 +21,8 @@ using Dates
 # ── Governance audit sink (GOV-002) ────────────────────────────────────────────
 # module_8 has no general event log yet, so halt/resume events are appended to a durable
 # JSONL. Point this at a module_8 events table when that API exists.
-_event_json(e) = "{" * join(["\"$(k)\":\"$(v)\"" for (k, v) in pairs(e)], ",") * "}"
+_json_esc(s) = replace(string(s), "\\" => "\\\\", "\"" => "\\\"", "\n" => "\\n", "\r" => "\\r", "\t" => "\\t")
+_event_json(e) = "{" * join(["\"$(_json_esc(k))\":\"$(_json_esc(v))\"" for (k, v) in pairs(e)], ",") * "}"
 function _audit_sink(path::String)
     mkpath(dirname(path))
     return function (event)
@@ -62,6 +63,11 @@ function make_recorder(ledger;
                        mid_prices::AbstractDict = Dict{String,Float64}(),
                        adv::AbstractDict        = Dict{String,Float64}(),
                        sigma::AbstractDict      = Dict{String,Float64}())
+    # L3: without real market-impact inputs the module_10 cascade-impact analysis is zeroed
+    # (fill lineage is still recorded correctly). Warn once, loudly, so this isn't silent.
+    (isempty(mid_prices) && isempty(adv) && isempty(sigma)) &&
+        @warn "make_recorder: no market-impact inputs (mid/ADV/σ) — module_10 cascade IMPACT " *
+              "analysis will be zeroed. Fill lineage (AUDIT-001) is unaffected."
     return function (e)
         (e.signal_id === nothing || e.regime === nothing || e.solve_id === nothing) &&
             error("fill missing lineage — refusing to record (REQ-AUDIT-001): order $(e.order_id)")
@@ -96,6 +102,10 @@ Drive one governed rebalance: for each symbol, order the delta between the targe
 (fill-driven) current position through `submit_governed!`; then drain+record fills and
 reconcile against the broker. Idempotency key is `pool|symbol|solve_id`, so re-running the
 same solve does not double-submit.
+
+L5 note: idempotency is solve-scoped, so a *partial* fill is NOT topped up within the same
+solve (the key dedups the retry). Remaining quantity is ordered on the next solve, when the
+fill-driven `expected` reflects the partial. This suits daily rebalancing.
 """
 function execute_rebalance!(ctrl, ledger;
                             targets::AbstractDict,
@@ -105,7 +115,7 @@ function execute_rebalance!(ctrl, ledger;
                             recorder = make_recorder(ledger))
     acks = OrderAck[]
     for (sym, tgt) in targets
-        cur   = get(ctrl.expected, sym, 0.0)
+        cur   = expected_position(ctrl, sym)   # L2: locked accessor, not a raw field read
         delta = tgt - cur
         abs(delta) < 1 && continue                       # whole-share dead zone
         side  = delta > 0 ? :buy : :sell
@@ -122,4 +132,40 @@ function execute_rebalance!(ctrl, ledger;
     fills = process_fills!(ctrl; record = recorder)
     reconciled = reconcile!(ctrl)
     return (acks = acks, fills = fills, reconciled = reconciled)
+end
+
+"""
+    flatten!(ctrl, ledger; prices, signal_id, regime, solve_id, settle_secs=3, recorder=...)
+      -> Vector{OrderAck}
+
+Emergency liquidation (L1): submit risk-reducing orders to close EVERY open position toward
+zero via `submit_liquidation!` (which bypasses the kill switch, per-pool halt, staleness, and
+budget — you must be able to flatten under those conditions), then record fills + reconcile.
+
+Correct emergency sequence in the runner: `halt!` to stop new normal emission, THEN
+`flatten!` — liquidation bypasses the halt, so it still gets you out. (`halt!`-alone leaves
+the book on; routing liquidation through `submit_governed!` would be rejected by the halt.)
+"""
+function flatten!(ctrl, ledger;
+                  prices::AbstractDict = Dict{String,Float64}(),
+                  signal_id::String, regime::String, solve_id::String,
+                  settle_secs::Real = 3, recorder = make_recorder(ledger))
+    acks = OrderAck[]
+    for (sym, pos) in positions_snapshot(ctrl)
+        abs(pos) < 1 && continue
+        side = pos > 0 ? :sell : :buy                 # opposite side closes the position
+        qty  = abs(round(Int, pos))
+        cid  = "LIQ|$(sym)|$(solve_id)"
+        o = VenueOrder(; client_order_id = cid, symbol = sym, side = side, quantity = qty,
+                       order_type = :market, ref_price = get(prices, sym, nothing),
+                       pool_id = pool_of(ctrl, sym, "liquidation"),
+                       signal_id = signal_id, regime = regime, solve_id = solve_id)
+        ack = submit_liquidation!(ctrl, o)
+        push!(acks, ack)
+        @info "liquidation order" symbol=sym pos=pos status=ack.status error=ack.error
+    end
+    settle_secs > 0 && sleep(settle_secs)
+    process_fills!(ctrl; record = recorder)
+    reconcile!(ctrl)
+    return acks
 end

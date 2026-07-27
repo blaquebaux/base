@@ -155,9 +155,11 @@ function run_daily_recursive()
                 feed_staleness!(ctrl, pool; stale = stale_count >= 3)
 
                 if should_liquidate
-                    @warn "EMERGENCY — halting all new emission (REQ-GOV-002)"
+                    @warn "EMERGENCY — halt new emission, then flatten the book (REQ-GOV-002)"
                     halt!(ctrl, "emergency liquidation trigger (VVIX/envelope)")
-                    # Liquidation orders themselves would also route via submit_governed!.
+                    liq = flatten!(ctrl, ledger; signal_id = "emergency", regime = regime_name,
+                                   solve_id = Dates.format(dt, "yyyymmdd"))
+                    @info "Emergency flatten complete" liquidation_orders=length(liq)
                 else
                     targets = compute_targets(probs, sizing, market_state)   # STRATEGY SEAM (placeholder → empty)
                     prices  = Dict{String,Float64}()                         # decision-time ref prices (from market data)
