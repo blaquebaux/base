@@ -11,8 +11,21 @@ include("../src/module_3_pca/module_3_pca.jl")
 include("../src/module_5_dpm/module_5_dpm.jl")
 include("../src/module_6_cascade/module_6_cascade.jl")
 include("../src/module_7_execution/module_7_execution.jl")
+include("../src/module_10_feedback/module_10_feedback.jl")
 
-using .DataIngestion, .PCACompression, .DPM, .CascadeInterface, .ExecutionLayer
+using .DataIngestion, .PCACompression, .DPM, .CascadeInterface, .ExecutionLayer, .FeedbackLayer
+
+include("live_execution.jl")   # governed execution glue (build_live_controller, execute_rebalance!, ...)
+
+"""
+    compute_targets(probs, sizing, market_state) -> Dict{String,Float64}
+
+STRATEGY SEAM (placeholder). Maps regime probabilities + position sizing → desired signed
+share positions per symbol. The concrete mapping (pool universe × blended cascade weights)
+does not exist yet, so this returns an empty dict and `execute_rebalance!` no-ops. Fill this
+in to actually trade.
+"""
+compute_targets(probs, sizing, market_state) = Dict{String,Float64}()
 
 """
     run_daily_recursive()
@@ -115,47 +128,48 @@ function run_daily_recursive()
         @info "Position sizing" active_pct=sizing.active_pct 
               defensive_pct=sizing.defensive_pct exposure=sizing.exposure
 
-        # 7. Send to execution layer
-        @info "Step 7: Sending to execution layer"
+        # 7. Governed execution (DRAFT integration; gated off unless BB_LIVE_EXEC=yes).
+        #    Routes through the venue-agnostic ExecutionController — every order-path invariant
+        #    (idempotency, lineage, per-pool budget/loss/staleness, kill switch) is enforced,
+        #    fills are recorded to the ledger with lineage, and positions reconcile vs the broker.
+        @info "Step 7: Governed execution"
 
-        # Check circuit breakers
+        regime_name = ("fixed", "growth", "floating")[argmax([probs.p_fixed, probs.p_growth, probs.p_floating])]
+
         cb_state = CircuitBreakerStateMachine()
-        should_liquidate, new_cb_state = check_emergency_liquidation(
-            market_state.vvix.value,
-            market_state.vix.value,
-            0.05,  # Current envelope width (placeholder)
-            0.02,  # 6-month median envelope (placeholder)
-            cb_state
-        )
+        should_liquidate, _ = check_emergency_liquidation(
+            market_state.vvix.value, market_state.vix.value,
+            0.05, 0.02, cb_state)   # envelope width / 6-mo median (placeholders)
 
-        if should_liquidate
-            @warn "EMERGENCY LIQUIDATION TRIGGERED"
-            # Send liquidation orders
-            liquidation_order = IBKROrder(
-                "SPY", MARKET, nothing, -100, "MAIN"
-            )
-            success, order_id, error = send_order(liquidation_order)
-
-            if success
-                @info "Liquidation order sent" order_id=order_id
-            else
-                @error "Liquidation order failed" error=error
-            end
+        if get(ENV, "BB_LIVE_EXEC", "no") != "yes"
+            @info "Execution disabled (dry run). Set BB_LIVE_EXEC=yes with a paper Gateway to enable." should_liquidate=should_liquidate
         else
-            # Normal rebalancing
-            # Compute target positions based on blended weights
-            target_exposure = sizing.exposure
+            built = build_live_controller()          # connects to IBKR (paper via IBKR_PORT)
+            ctrl, ledger = built.ctrl, built.ledger
+            try
+                connect!(built.venue) || error("IBKR connect failed — is the paper Gateway running?")
+                pool = "us"
+                set_pool_budget!(ctrl, pool, 10_000.0)         # per-pool caps (placeholder values)
+                set_pool_loss_limit!(ctrl, pool, 1_000.0)
+                set_pool_staleness!(ctrl, pool, Minute(30))
+                feed_staleness!(ctrl, pool; stale = stale_count >= 3)
 
-            if target_exposure > 0
-                # Apply position floor
-                notional = apply_position_floor(target_exposure, 500.0)
-
-                if notional > 0
-                    @info "Sending rebalance order" notional=notional
-                    # In production: compute actual quantities and send orders
+                if should_liquidate
+                    @warn "EMERGENCY — halting all new emission (REQ-GOV-002)"
+                    halt!(ctrl, "emergency liquidation trigger (VVIX/envelope)")
+                    # Liquidation orders themselves would also route via submit_governed!.
                 else
-                    @info "Order below position floor, skipping"
+                    targets = compute_targets(probs, sizing, market_state)   # STRATEGY SEAM (placeholder → empty)
+                    prices  = Dict{String,Float64}()                         # decision-time ref prices (from market data)
+                    res = execute_rebalance!(ctrl, ledger;
+                        targets = targets, prices = prices,
+                        signal_id = "daily", regime = regime_name,
+                        solve_id = Dates.format(dt, "yyyymmdd"), pool_id = pool)
+                    @info "Rebalance complete" orders=length(res.acks) fills=length(res.fills) reconciled=res.reconciled
                 end
+            finally
+                disconnect!(built.venue)
+                close_ledger(ledger)
             end
         end
 

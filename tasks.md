@@ -105,10 +105,16 @@ fleet machine — not a repo clone. The governed controller above is built once.
       connect → submit_governed! → process_fills! → reconcile!) and `docs/PAPER_GATEWAY_RUNBOOK.md`.
 - [ ] **USER: run the paper smoke test** against a live IB Gateway paper session (only you can —
       needs Gateway + paper login). Confirms runtime connect/place/fill. Closes #4.
-- [ ] **Runner integration (gated on smoke passing).** Wire `run_daily_recursive.jl` execution
-      step through `submit_governed!`/`IBKRVenue`; feed staleness (`mark_data_fresh!`) + PnL
-      (`update_pnl!`); connect `process_fills!` → ledger `record_fill` and `audit` sink →
-      module_8. Note: the runner's sizing→per-symbol-quantity step is currently a placeholder.
+- [x] **Runner integration DRAFTED.** `scripts/live_execution.jl` (glue: `build_live_controller`,
+      `make_recorder` → ledger with lineage + execId-based fill_id, `execute_rebalance!`,
+      `feed_staleness!`, governance audit JSONL sink). `run_daily_recursive.jl` step 7 now routes
+      through the governed path (gated behind `BB_LIVE_EXEC=yes`; emergency → `halt!`). Verified by
+      `test/test_live_integration.jl` (11/11, mock venue + REAL SQLite ledger). Threaded IBKR
+      `execId` through the fill pipeline so ledger `fill_id` is unique (AUDIT-001).
+- [ ] **USER: run paper smoke, then flip `BB_LIVE_EXEC=yes`** to exercise the runner live.
+- [ ] **STRATEGY SEAM: implement `compute_targets`** (regime/sizing → per-symbol share targets).
+      Currently a placeholder returning `{}` (no-op). This is the missing strategy mapping.
+- [ ] **Wire PnL feed** (`update_pnl!`) — the runner doesn't compute per-pool PnL yet (needs marks/cost basis).
 - [ ] **Connection-drop detection** — wire via Jib's actual mechanism (reader Task end / conn
       state); Jib has no `connectionClosed` callback.
 

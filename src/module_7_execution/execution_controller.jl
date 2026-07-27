@@ -353,6 +353,7 @@ function process_fills!(ctrl::ExecutionController; record::Function = (_) -> not
         e = (
             symbol          = f.symbol,
             order_id        = string(f.order_id),
+            exec_id         = hasproperty(f, :exec_id) ? string(f.exec_id) : "",  # unique fill id (AUDIT-001 ledger)
             signed_qty      = signed,
             fill_price      = f.fill_price,
             timestamp       = f.timestamp,

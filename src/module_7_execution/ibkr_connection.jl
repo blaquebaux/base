@@ -91,6 +91,7 @@ function _build_wrapper(ibkr::IBKRConnection)
             fill_record = (
                 symbol     = contract.symbol,
                 order_id   = execution.orderId,
+                exec_id    = execution.execId,   # unique per fill — needed for the ledger's fill_id (AUDIT-001)
                 fill_price = execution.price,
                 shares     = execution.shares,
                 side       = execution.side,
