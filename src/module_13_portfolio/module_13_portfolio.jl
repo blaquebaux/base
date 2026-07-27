@@ -27,6 +27,8 @@ export simple_returns, log_returns, mean_returns,
        random_portfolios, resampled_frontier,
        gaussian_dgp, iid_bootstrap, block_bootstrap, stationary_bootstrap,
        student_t_dgp, t_copula_dgp,
-       backtest, equal_weight
+       backtest, equal_weight,
+       tsmom_signal, tsmom_weights, voltarget_exposure, spine_weights, spine_strategy,
+       SpineState, spine_step!, spine_targets, regime_multiplier
 
 end # module PortfolioOptModule

@@ -43,6 +43,8 @@ run_module_tests("Module 5: DPM", "test_module_5.jl")
 run_module_tests("Module 6: Cascade Interface", "test_module_6.jl")
 run_module_tests("Module 7: Execution Layer", "test_module_7.jl")
 run_module_tests("Module 8: Governance", "test_module_8.jl")
+run_module_tests("Module 13: Portfolio Spine (Path-B strategy)", "test_spine.jl")
+run_module_tests("Equity Panel (spine data adapter)", "test_equity_panel.jl")
 run_module_tests("Execution Controller (governed order path)", "test_execution_controller.jl")
 run_module_tests("Live Execution Integration (venue+ledger+audit)", "test_live_integration.jl")
 
