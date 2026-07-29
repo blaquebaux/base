@@ -101,7 +101,10 @@ governed execution path.** Only the live IBKR data/venue swap remains (blocked o
 | wiring | `scripts/run_daily_recursive.jl` `compute_targets` → spine → governed `execute_rebalance!`; Serialization state persistence; `spine_regime=:dd` | ✅ loads clean |
 | end-to-end | `scripts/spine_end_to_end.jl`: CSV → spine → governed orders → SimVenue fills → SQLite ledger w/ lineage → reconcile | ✅ 12 rebalances, **59 fills w/ AUDIT-001 lineage** |
 | integration test | `test/test_spine_pipeline.jl` — the full pipeline as a registered test (asserts reconcile + lineage every run) | ✅ **11/11** |
-| live adapter (write-ahead) | `src/module_1_data/ibkr_panel.jl` — `IBKRPanelProvider` (Jib `reqHistoricalData`, verified offline against the Jib v0.30 API) | ⏳ compiles; runtime awaits Gateway |
+| IBKR adapter (write-ahead) | `src/module_1_data/ibkr_panel.jl` — `IBKRPanelProvider` (Jib `reqHistoricalData`, verified offline) | ⏸ kept as a second venue (IBKR **rejected** the account) |
+| **Plan-B data (Alpaca)** | `src/module_1_data/alpaca_panel.jl` — `AlpacaPanelProvider` (REST v2 daily bars, total-return, paginated) | ✅ compiles; **runnable with paper keys** |
+| **Plan-B venue (Alpaca)** | `src/module_7_execution/venues/alpaca.jl` — `AlpacaVenue` (POST /v2/orders, positions, drain fills; client_order_id idempotency) | ✅ **12/12**; 346/346 controller regression green |
+| **Alpaca paper runner** | `scripts/spine_alpaca_paper.jl` — export paper keys → spine on Alpaca paper end-to-end | ✅ compiles; awaits free paper keys |
 
 **Design facts baked in (verified, not assumed):**
 - Per-sleeve vol-target uses each sleeve's **realized P&L vol** (RiskMetrics span-60), *not* ex-ante
@@ -114,14 +117,19 @@ governed execution path.** Only the live IBKR data/venue swap remains (blocked o
 - Fixed a pre-existing parse bug in `run_daily_recursive.jl` (malformed multi-line `@info`) — the
   draft runner had never parsed/loaded before.
 
-**Remaining for live paper (blocked on IBKR account approval, not on code):**
-`IBKRPanelProvider` is **written and compiles** (verified offline against the Jib API); what's
-left is *runtime* — (1) point the runner at `IBKRPanelProvider` instead of `CSVPanelProvider`
-(one line; same `panel_at` contract), (2) use `IBKRVenue` instead of `SimVenue` (already the
-`build_live_controller` default), (3) run the paper smoke test once the Gateway is up. Everything
-between the data source and the venue is exercised exactly as it will run live (proven by
-`test/test_spine_pipeline.jl`). The market-neutral L/S "Path-A sequence" below is the **research
-track**, not the spine.
+**Broker pivot — IBKR REJECTED → Alpaca primary (2026-07-27).** IBKR rejected the account
+(funded; no explanation). Pivoted to **Alpaca** (US resident) — the venue-abstraction's payoff:
+`PanelProvider` + `ExecutionVenue` made it a swap, not a rewrite. Alpaca **paper needs no
+account approval**, so this is *runnable now*, further than IBKR ever allowed. The IBKR adapters
+are kept as a ready second venue if the account is ever re-applied.
+
+**To run on Alpaca paper (the only remaining step is free paper keys, no approval):**
+`export ALPACA_KEY_ID=… ALPACA_SECRET_KEY=…` then `julia --project=. scripts/spine_alpaca_paper.jl`.
+That drives the full path — Alpaca data → spine (regime :dd) → governed orders → Alpaca paper
+fills → ledger w/ lineage → reconcile. Everything between data and venue is proven by
+`test/test_spine_pipeline.jl`. **Live money** later = `AlpacaConfig(paper=false)` after standard
+US-KYC approval (lighter than IBKR; Tradier is the US backup) AND governed invariants green.
+The market-neutral L/S "Path-A sequence" below is the **research track**, not the spine.
 
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
