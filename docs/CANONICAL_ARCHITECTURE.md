@@ -131,6 +131,35 @@ fills → ledger w/ lineage → reconcile. Everything between data and venue is 
 US-KYC approval (lighter than IBKR; Tradier is the US backup) AND governed invariants green.
 The market-neutral L/S "Path-A sequence" below is the **research track**, not the spine.
 
+## Cadence & horizon — DAILY, tested (2026-07-29)
+
+**Intraday cadence tested and rejected.** On 17,659 real Alpaca 15-min bars (2022–2026, incl. the
+2022 bear + Fed cycle), net of costs:
+- Hold the daily spine book *through* the day: **Sharpe 1.24, maxDD −8.4%** — already strong.
+- Intraday vol-brake: **never fired (0% of bars)** — the 5-asset diversified book barely moves
+  intraday even on Fed days (stocks/bonds/gold/commodities offset *within* the bar);
+  diversification IS the intraday shock absorber.
+- Intraday drawdown-brake: fired 4.2%, **hurt** (−1% CAGR, −0.08 Sharpe for −0.7% maxDD) — whipsaw.
+- Full 15-min rebalancing = pure cost drag (risk premia don't change in 15 min; ~34 bps/bar turnover).
+- 15-min *prediction* was directly tested earlier → noise (IC≈0).
+**DECISION: once-daily rebalance, 9:20 ET pre-open.** Revisit only if the book becomes concentrated
+or a real intraday alpha is found.
+
+**Why short-horizon shorting is a reversal trap (momentum vs reversal by horizon).** IC of
+trailing k-day return → next-day return, pooled across the 5 assets, 2006–2026:
+
+| horizon | 1d | 2d | 3d | 5d | 10d | 21d | 63d | 126d | 252d |
+|---|---|---|---|---|---|---|---|---|---|
+| IC | −.038 | **−.041** | −.035 | −.031 | −.021 | −.010 | −.000 | +.005 | +.002 |
+
+Short horizons (1–63d) are **REVERSAL** (negative IC — a 2-day drop tends to *bounce*; 2d is the
+strongest reversal); **MOMENTUM** (positive IC) appears only at 126–252d. This is exactly why the
+trend sleeve uses a **12-month** lookback and correctly ignores 2-day moves. "Short the 2-day
+bloodbath" fights the strongest short-horizon force in the data. The spine shorts *sustained*
+(12-mo) downtrends (e.g. bonds in 2022, +4.4%), and *de-risks* (vol-target + regime brake) on a
+short selloff rather than flipping short. The kill switch (`HALT` file) is a MANUAL/alert stop —
+it does not auto-fire on a drawdown; the auto-response to a selloff is de-risking, not a flat exit.
+
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
 **in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack
