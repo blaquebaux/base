@@ -114,6 +114,30 @@ function submit!(v::AlpacaVenue, o::VenueOrder)::OrderAck
     end
 end
 
+"""
+    account_info(v::AlpacaVenue) -> NamedTuple | nothing
+
+`GET /v2/account` → `(; status, equity, cash, buying_power, trading_blocked, account_blocked)`.
+`nothing` on missing keys / HTTP error. Feeds the Layer-3 safety gate (equity/drawdown, buying
+power, account status).
+"""
+function account_info(v::AlpacaVenue)
+    _akeys(v) || return nothing
+    resp = try
+        HTTP.get(string(v.cfg.base_url, "/v2/account"); headers = _ahdrs(v),
+                 readtimeout = _ato(v), status_exception = false, retry = false)
+    catch e
+        @warn "AlpacaVenue account_info threw" exception=e; return nothing
+    end
+    resp.status == 200 || (@warn "AlpacaVenue account_info HTTP $(resp.status)" body=String(resp.body); return nothing)
+    j = JSON3.read(resp.body)
+    num(x) = (v = tryparse(Float64, string(x)); v === nothing ? 0.0 : v)
+    return (status = String(get(j, :status, "")), equity = num(get(j, :equity, "0")),
+            cash = num(get(j, :cash, "0")), buying_power = num(get(j, :buying_power, "0")),
+            trading_blocked = Bool(get(j, :trading_blocked, false)),
+            account_blocked = Bool(get(j, :account_blocked, false)))
+end
+
 function positions(v::AlpacaVenue, account::String)::Dict{String,Float64}
     d = Dict{String,Float64}()
     _akeys(v) || return d
