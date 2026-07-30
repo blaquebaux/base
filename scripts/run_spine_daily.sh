@@ -42,9 +42,10 @@ elif [ "$NEXT_OPEN" != "$ET_TODAY" ]; then
     echo "not a trading day (next_open=$NEXT_OPEN, et_today=$ET_TODAY) — skipping"; exit 0
 fi
 
-# 3) the deterministic spine (governed order path; no LLM)
+# 3) the deterministic spine through the Layer-3 safety gate (paper unless BB_LIVE_CONFIRM set).
+#    Every pre-trade guard runs; on a trip it halts + alerts and places nothing.
 cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
-"$JULIA" --project=. scripts/spine_alpaca_paper.jl
+"$JULIA" --project=. scripts/spine_live.jl
 RC=$?
 echo "================ done rc=$RC $(TZ=America/New_York date '+%T %Z') ================"
 exit $RC
