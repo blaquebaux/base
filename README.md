@@ -1,51 +1,116 @@
-# Blaque Baux — Canonical Repository
+# Blaque Baux
 
-Version-controlled root for the Blaque Baux Gamma-ARMA trading system. Based on the
-**CherryPick** build (2026-05-31) — the current production-grade Julia implementation,
-itself a scored cherry-pick across seven implementations (Kimi base + Deepseek-v2
-integration; see `CHERRY_PICK_NOTES.md`).
+**A governed, systematic risk-premium harvesting platform — in Julia.**
 
-> Earlier Python trees (`blaque_baux-v1/-v2/_polyglot`, ~April 2026) were prototypes and
-> are **superseded**. They remain in `Downloads/` and in this repo's git history (first
-> commit) for reference only.
+Blaque Baux does *not* try to predict returns. After rigorous out-of-sample testing found no
+exploitable predictive edge at the horizons and instruments studied, it was built around the edge
+that *does* survive: **risk structure**. It harvests diversification and trend premia, times risk
+with a stateful daily process, and routes every order through a governed execution layer that
+enforces hard, tested invariants.
 
-## System layout (Julia, modules 1–13)
+> **Not investment advice.** Educational/research software. All performance figures are historical
+> backtests or paper-trading results, net of modeled costs — not a promise of future results.
+> Trading carries substantial risk, including loss of principal. See [LICENSE](LICENSE).
 
-| Module | Purpose | Key invariants |
-|---|---|---|
-| `module_1_data` | Ingestion, normalization, staleness (Cboe/FRED/Deribit/TGA) | REQ-DATA-001/002 |
-| `module_2_smoothing` | LOWESS / SG / adaptive median | — |
-| `module_3_pca` | Vol-surface + yield-curve PCA → 6-dim state | — |
-| `module_4_arma` | ARMA(p,q) + GARCH(1,1) QMLE | REQ-REGIME-001 |
-| `module_5_dpm` | Dirichlet Process Mixture (particle filter, EM) | REQ-REGIME-001 |
-| `module_6_cascade` | Cascade interface, regional sizing (APAC/EMEA/US) | REQ-REGIME-001, REQ-RISK-003 |
-| `module_7_execution` | IBKR execution, 4-state circuit breaker (`ReentrantLock`) | REQ-EXEC-001 |
-| `module_8_governance` | Version registry, serialization, rollback | REQ-GOV-001 |
-| `module_9_0dte` | 0DTE overlay | — |
-| `module_10_feedback` | Execution ledger (`FillRecord`), cascade feedback | REQ-AUDIT-001/002 |
-| `module_11_cv` | Purged K-Fold / CPCV (López de Prado) | REQ-SIM-001 |
-| `module_12_sor` | Smart order router (+ cuOpt GPU bridge) | REQ-EXEC-001 |
-| `module_13_portfolio` | PortfolioOpt (BL, mean-var, risk-based, robust, tail-risk, cost-aware) | REQ-RISK-001/002 |
+---
 
-Strata implementations: `StructuralStatistics.jl`, `ComputationalStatistics.jl`,
-`GeometricCoordinationLayer.jl` (tested by `test/test_stratum_i.jl`, `test_stratum_ii.jl`).
+## What it is
 
-Orchestration: `scripts/run_daily_recursive.jl`, `run_em_weekly.jl`,
-`backtest_validation.jl`; Python glue `massive_client.py` (data/dashboard),
-`cuopt_bridge.py` (GPU SOR).
+- **The spine** — a two-sleeve strategy: an inverse-vol / equal-risk-contribution **base** that
+  harvests the diversification premium by risk structure, plus a 12-month time-series-momentum
+  **trend** sleeve that hedges crises (it made *money* in 2022, short bonds / long energy). Each
+  sleeve is volatility-targeted on its own realized P&L, blended, and scaled by a drawdown-based
+  **regime brake**. Rebalanced once daily.
+- **Governed execution** — a venue-agnostic controller enforcing idempotency, per-pool budget and
+  loss limits, data-staleness, position reconciliation, a kill switch, and full fill lineage. No
+  language model is anywhere near the order path; the strategy is reproducible code.
+- **A live-money safety gate** — pre-trade drawdown/loss halts, gross-leverage and per-name caps,
+  account/data checks, and alerting, on top of the controller's invariants.
+- **Honest validation** — the methodology and the results, including *what didn't work*, are
+  documented in full (see below). This repo tries to be a trustworthy quant reference, not a pitch.
 
-## The spec stack
+## Performance (historical, net of ~2 bps/side; paper-verified live path)
 
-- **`Requirements.md`** — invariants first, each with a permanent `REQ-ID`. Append-only.
-- **`design.md`** — traceability matrix: REQ → module → **existing test** → enforcement → conformance.
-- **`tasks.md`** — backlog: close conformance gaps, cover the untested modules 9–13.
-- **`TESTPLAN.md`** — verification, mapped onto the existing 650+-case suite.
-- **`DOCUMENT-CONTROL.md`** — versioning + invariant-change sign-off.
-- **`docs/appendices/`** — Gamma-ARMA framework, Statistical Architecture, Pre-Dist Review (`.docx`).
+| | Sharpe | Sortino | Max drawdown | 2022 | Cadence |
+|---|---|---|---|---|---|
+| Spine (production, regime brake) | **~0.97** | ~1.30 | **~−11%** | −1.4% | daily |
 
-## Run
+Honest context: this is a **single-digit-CAGR, ~1.0-Sharpe** strategy — institutional-quality
+*risk-adjusted* performance, not headline returns. Leverage to reach double digits is possible but
+carries proportional (double-digit) drawdown, and is net-negative at today's margin rates — the
+trade-off is quantified in [`docs/leverage_decision.html`](docs/leverage_decision.html). There is
+no double-digit-return-at-low-risk configuration, and this repo says so.
+
+## The mathematics
+
+Everything — covariance estimation, the sleeve construction, risk metrics (Sharpe/Sortino/Calmar/
+VaR/CVaR), the governed-execution invariants, the validation methodology (Information Coefficient),
+and the empirical findings (momentum-vs-reversal by horizon, daily-vs-intraday, the leverage
+trade-off) — is specified with formulas and code references in:
+
+### → [`docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md)
+
+Architecture and design decisions: [`docs/CANONICAL_ARCHITECTURE.md`](docs/CANONICAL_ARCHITECTURE.md).
+
+## Quickstart
+
+Requires Julia (1.10+). From the repo root:
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
-julia --project=. test/runtests.jl
+julia --project=. -e 'using Pkg; Pkg.instantiate()'   # one-time
+julia --project=. test/runtests.jl                    # gate suites (should be green)
 ```
+
+Backtest / inspect the spine (uses the bundled `scripts/data/sector_panel.csv`):
+
+```bash
+julia --project=. scripts/leverage_decision_data.jl   # regenerates the leverage-analysis data
+```
+
+**Paper trading** through [Alpaca](https://alpaca.markets) (paper keys need no account approval):
+
+```bash
+export ALPACA_KEY_ID=PK_your_key   ALPACA_SECRET_KEY=your_secret
+julia --project=. scripts/spine_live.jl               # PAPER by default; safety gate always on
+```
+
+Live money is deliberately gated: it requires an explicit `BB_LIVE_CONFIRM` sentinel, a funded /
+approved brokerage account, and the safety gate green. Do not flip it lightly.
+
+## Repository layout
+
+```
+src/
+  module_1_data/        data adapters: CSV, Alpaca, IBKR panel providers
+  module_7_execution/   governed ExecutionController + venue adapters (Alpaca / IBKR)
+  module_8_governance/  Layer-3 live-money safety gate
+  module_11_cv/         purged / combinatorial cross-validation
+  module_13_portfolio/  PortfolioOpt: moments, risk-based weights, the spine, metrics
+scripts/
+  spine_live.jl         production daily driver (safety-gated)
+  run_spine_daily.sh    launchd wrapper (scheduled pre-open run)
+  spine_end_to_end.jl   full pipeline on cached data (integration demo)
+docs/
+  FINANCIAL_METHODS.md      the math (start here)
+  CANONICAL_ARCHITECTURE.md architecture & decisions
+  leverage_decision.html    interactive leverage trade-off visual
+test/                    gate + (quarantined legacy) suites
+```
+
+## Status
+
+- **Paper-tested end-to-end** (data → strategy → governed orders → ledger with lineage →
+  reconciliation) against a real broker paper account.
+- The strategy is validated out-of-sample; the live path is verified on paper.
+- Real capital has **not** been deployed. The legacy Gamma-ARMA base modules (a separate research
+  lineage) are quarantined from the test gate; see `test/runtests.jl`.
+
+## Contributing / using this
+
+You're welcome to study, fork, and build on this. If you deploy real capital, **validate
+independently** and start on paper. Issues and PRs that improve the math, the tests, or the
+execution safety are especially welcome.
+
+## License
+
+[MIT](LICENSE), with a not-financial-advice notice. © 2026 Carter Warrens.
