@@ -67,6 +67,12 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
         prices = Dict(panel.symbols[i] => panel.prices[i] for i in eachindex(panel.symbols))
 
         @info "Spine targets" regime=reg targets=Dict(k => round(Int, v) for (k, v) in targets)
+        # Seed expected from the broker's actual holdings so we trade the DELTA, not the full
+        # target again (a fresh process starts at 0 and would otherwise stack positions daily).
+        for (sym, qty) in positions(venue, ctrl.account)
+            apply_fill!(ctrl, sym, qty)
+        end
+
         res = execute_rebalance!(ctrl, ledger; targets = targets, prices = prices,
             signal_id = "spine", regime = reg, solve_id = Dates.format(panel.asof, "yyyymmdd"),
             pool_id = pool, settle_secs = 5)          # give paper fills a moment to come back

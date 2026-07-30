@@ -97,6 +97,16 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
         ncanc = cancel_all_open!(venue); @info "cancelled stale orders" count=ncanc
         ncanc > 0 && sleep(2)
 
+        # Rebalance the DELTA, not the full target. A fresh daily process starts with expected=0,
+        # so seed it from the broker's ACTUAL holdings — otherwise it would re-place the whole
+        # target on top of prior fills (stacking positions, then a reconcile halt). Broker is the
+        # source of truth (survives restarts, manual edits, partial fills, corporate actions).
+        bpos = positions(venue, ctrl.account)
+        for (sym, qty) in bpos
+            apply_fill!(ctrl, sym, qty)
+        end
+        @info "seeded expected positions from broker" held=length(bpos)
+
         res = execute_rebalance!(ctrl, ledger; targets = targets, prices = prices,
             signal_id = "spine", regime = reg, solve_id = Dates.format(panel.asof, "yyyymmdd"),
             pool_id = pool, settle_secs = 5)

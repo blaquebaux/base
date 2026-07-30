@@ -124,4 +124,40 @@ end
     close_ledger(ledger)
 end
 
+@testset "seed expected from broker → rebalance trades the DELTA, no stacking" begin
+    tmp = mktempdir()
+    venue = MockVenue()
+    built = build_live_controller(; venue = venue,
+        ledger_config = LedgerConfig(; db_path = joinpath(tmp, "l.sqlite")),
+        audit_path = joinpath(tmp, "a.jsonl"))
+    ctrl, ledger = built.ctrl, built.ledger
+    set_pool_budget!(ctrl, "us", 1_000_000.0)
+    set_pool_staleness!(ctrl, "us", Second(60)); feed_staleness!(ctrl, "us"; stale = false)
+
+    # Broker already holds 10 AAPL from a prior day; a fresh controller seeds expected from it.
+    venue.posns = Dict("AAPL" => 10.0)
+    for (s, q) in ExecutionLayer.positions(venue, ""); apply_fill!(ctrl, s, q) end
+    @test expected_position(ctrl, "AAPL") == 10.0
+
+    # Target == current holding ⇒ delta 0 ⇒ NO order (the fix: without seeding it would
+    # re-place the full 10 on top of the existing 10).
+    res = execute_rebalance!(ctrl, ledger; targets = Dict("AAPL" => 10.0),
+        prices = Dict("AAPL" => 100.0), signal_id = "s", regime = "calm",
+        solve_id = "D2", pool_id = "us", settle_secs = 0)
+    @test isempty(res.acks)
+    @test venue.submits == 0
+
+    # Target 15 ⇒ only the +5 delta is ordered.
+    venue.fills = [(symbol="AAPL", order_id="OID1", exec_id="EX1", fill_price=100.0, shares=5, side="BOT", timestamp=now(UTC))]
+    venue.posns = Dict("AAPL" => 15.0)
+    res2 = execute_rebalance!(ctrl, ledger; targets = Dict("AAPL" => 15.0),
+        prices = Dict("AAPL" => 100.0), signal_id = "s", regime = "calm",
+        solve_id = "D2b", pool_id = "us", settle_secs = 0)
+    @test length(res2.acks) == 1 && res2.acks[1].status == :accepted
+    @test venue.submits == 1
+    @test expected_position(ctrl, "AAPL") == 15.0 && res2.reconciled == true
+
+    close_ledger(ledger)
+end
+
 end  # module
