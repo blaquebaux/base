@@ -135,7 +135,7 @@ function drain_fills(v::AlpacaVenue)
     fills = NamedTuple[]
     _akeys(v) || return fills
     lock(v._lock) do
-        after = Dates.format(v.since, dateformat"yyyy-mm-ddTHH:MM:SSZ")
+        after = Dates.format(v.since, dateformat"yyyy-mm-ddTHH:MM:SS") * "Z"  # literal Z (TimeZones treats Z as a tz token)
         resp = try
             HTTP.get(string(v.cfg.base_url, "/v2/orders"); headers = _ahdrs(v),
                      query = Dict("status" => "closed", "after" => after,
