@@ -36,6 +36,9 @@ using .ExecutionLayer
     # Paper vs live base URL selection.
     @test occursin("paper-api.alpaca.markets", AlpacaConfig(; paper = true).base_url)
     @test occursin("//api.alpaca.markets", AlpacaConfig(; paper = false).base_url)
+
+    # cancel_all_open! is a no-op (0, no network) without keys.
+    @test cancel_all_open!(AlpacaVenue(AlpacaConfig(; key_id = "", secret = ""))) == 0
 end
 
 end # module

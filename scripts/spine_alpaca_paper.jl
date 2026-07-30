@@ -49,6 +49,12 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
         set_pool_staleness!(ctrl, pool, Day(5))
         feed_staleness!(ctrl, pool; stale = false)
 
+        # Hygiene: clear any stale working orders BEFORE placing new ones, so a prior day's
+        # unfilled orders can't double up with today's. Idempotent to run when there are none.
+        ncanc = cancel_all_open!(venue)
+        @info "Cancelled stale open orders" count=ncanc
+        ncanc > 0 && sleep(2)                  # let the cancels register before we submit
+
         provider = AlpacaPanelProvider(universe; lookback = 252)
         panel = panel_at(provider)                              # trailing daily bars up to today
         @info "Panel pulled" asof=panel.asof bars=size(panel.returns, 1) symbols=panel.symbols

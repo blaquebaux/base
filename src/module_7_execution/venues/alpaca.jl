@@ -176,3 +176,28 @@ function cancel!(v::AlpacaVenue, venue_order_id::String)::Bool
     end
     return resp.status in (200, 204)
 end
+
+"""
+    cancel_all_open!(v::AlpacaVenue) -> Int
+
+Cancel ALL open orders on the account (Alpaca `DELETE /v2/orders`); returns the number cancelled
+(0 if none / no keys, −1 on HTTP error). Daily-rebalance hygiene: call this BEFORE placing new
+orders so stale working orders can't double up with fresh ones. Cancels every open order, which
+is correct for a dedicated single-strategy account.
+"""
+function cancel_all_open!(v::AlpacaVenue)::Int
+    _akeys(v) || return 0
+    resp = try
+        HTTP.delete(string(v.cfg.base_url, "/v2/orders"); headers = _ahdrs(v),
+                    readtimeout = _ato(v), status_exception = false, retry = false)
+    catch e
+        @warn "AlpacaVenue cancel_all_open! threw" exception=e; return -1
+    end
+    resp.status in (200, 204, 207) ||
+        (@warn "AlpacaVenue cancel_all_open! HTTP $(resp.status)" body=String(resp.body); return -1)
+    n = 0
+    if resp.status == 207                    # multi-status: one entry per attempted cancel
+        try; for _ in JSON3.read(resp.body); n += 1 end; catch; end
+    end
+    return n
+end
