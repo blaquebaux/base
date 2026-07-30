@@ -21,3 +21,13 @@ data_cache/
 
 # OS
 .DS_Store
+
+# BlaqueBaux runtime — ledger, spine state, audit + run logs (never commit; may contain
+# account/position data). Keys live in ~/.config/blaquebaux/alpaca.env, outside the repo.
+logs/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+*.jls
+*_audit.jsonl

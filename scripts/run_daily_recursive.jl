@@ -12,20 +12,35 @@ include("../src/module_5_dpm/module_5_dpm.jl")
 include("../src/module_6_cascade/module_6_cascade.jl")
 include("../src/module_7_execution/module_7_execution.jl")
 include("../src/module_10_feedback/module_10_feedback.jl")
+include("../src/module_13_portfolio/module_13_portfolio.jl")
 
 using .DataIngestion, .PCACompression, .DPM, .CascadeInterface, .ExecutionLayer, .FeedbackLayer
+using .PortfolioOptModule: SpineState, spine_step!, spine_targets
+using Serialization
 
 include("live_execution.jl")   # governed execution glue (build_live_controller, execute_rebalance!, ...)
 
 """
-    compute_targets(probs, sizing, market_state) -> Dict{String,Float64}
+    compute_targets(state::SpineState, panel, capital) -> Dict{String,Float64}
 
-STRATEGY SEAM (placeholder). Maps regime probabilities + position sizing → desired signed
-share positions per symbol. The concrete mapping (pool universe × blended cascade weights)
-does not exist yet, so this returns an empty dict and `execute_rebalance!` no-ops. Fill this
-in to actually trade.
+STRATEGY SEAM — the validated Path-B spine (d-3). `panel` is a passed-in NamedTuple
+`(; returns, symbols, prices)`: `returns` is the trailing `T×N` return window (last row =
+latest bar), `prices` the latest per-symbol prices. Advances the stateful spine one bar
+(equal-risk base ⊕ TSMOM trend, each vol-targeted on its own realized P&L) and maps the
+target book to signed share targets. The panel SOURCE is the IBKR data adapter (pending —
+d-4); until then callers pass `equity_panel = nothing` and this seam is inert.
 """
+compute_targets(state::SpineState, panel, capital::Real) =
+    spine_targets(spine_step!(state, panel.returns), panel.symbols, panel.prices, capital)
+
+# Macro-only fallback (no equity panel yet): emits no equity targets.
 compute_targets(probs, sizing, market_state) = Dict{String,Float64}()
+
+# The spine's per-sleeve vol state MUST persist across daily runs — load at start, save at end.
+# New state uses the d-5 regime overlay (:dd) by default; an existing state keeps its own regime.
+load_spine_state(path::AbstractString, n::Int; regime::Symbol = :dd) =
+    isfile(path) ? deserialize(path)::SpineState : SpineState(n; regime = regime)
+save_spine_state(path::AbstractString, state::SpineState) = serialize(path, state)
 
 """
     run_daily_recursive()
@@ -40,7 +55,9 @@ Pipeline:
 5. Blend cascade parameters
 6. Send position sizing to execution layer
 """
-function run_daily_recursive()
+function run_daily_recursive(; equity_panel = nothing,
+                             spine_state_path::AbstractString = "spine_state.jls",
+                             capital::Real = 10_000.0, spine_regime::Symbol = :dd)
     @info "Starting daily recursive update" timestamp=now(tz"America/New_York")
 
     try
@@ -50,8 +67,7 @@ function run_daily_recursive()
         market_state = DataIngestion.assemble_market_state(dt)
 
         stale_count = count_stale_signals(market_state)
-        @info "Market state assembled" stale_signals=stale_count 
-              vix=market_state.vix.value vxv=market_state.vxv.value
+        @info "Market state assembled" stale_signals=stale_count vix=market_state.vix.value vxv=market_state.vxv.value
 
         if stale_count >= 3
             @warn "Multiple stale signals detected, proceeding with caution"
@@ -107,17 +123,14 @@ function run_daily_recursive()
         # Simplified: use top 3 components
         probs = RegimeProbs(updated_params.weights[1:3])
 
-        @info "Regime probabilities" fixed=probs.p_fixed growth=probs.p_growth 
-              floating=probs.p_floating
+        @info "Regime probabilities" fixed=probs.p_fixed growth=probs.p_growth floating=probs.p_floating
 
         # 5. Blend cascade parameters
         @info "Step 5: Blending cascade parameters"
 
         blended = blend_cascade_params(probs)
 
-        @info "Blended parameters" trend=blended.trend_weight 
-              meanrev=blended.meanrev_weight defensive=blended.defensive_weight
-              stop_width=blended.stop_width_atr max_hold=blended.max_holding_days
+        @info "Blended parameters" trend=blended.trend_weight meanrev=blended.meanrev_weight defensive=blended.defensive_weight stop_width=blended.stop_width_atr max_hold=blended.max_holding_days
 
         # 6. Position sizing
         @info "Step 6: Computing position sizing"
@@ -125,8 +138,7 @@ function run_daily_recursive()
         total_capital = 10000.0  # Per regional pool
         sizing = compute_position_sizing(probs, total_capital)
 
-        @info "Position sizing" active_pct=sizing.active_pct 
-              defensive_pct=sizing.defensive_pct exposure=sizing.exposure
+        @info "Position sizing" active_pct=sizing.active_pct defensive_pct=sizing.defensive_pct exposure=sizing.exposure
 
         # 7. Governed execution (DRAFT integration; gated off unless BB_LIVE_EXEC=yes).
         #    Routes through the venue-agnostic ExecutionController — every order-path invariant
@@ -160,14 +172,19 @@ function run_daily_recursive()
                     liq = flatten!(ctrl, ledger; signal_id = "emergency", regime = regime_name,
                                    solve_id = Dates.format(dt, "yyyymmdd"))
                     @info "Emergency flatten complete" liquidation_orders=length(liq)
+                elseif equity_panel === nothing
+                    @info "No equity panel wired yet (IBKR adapter pending — d-4); spine rebalance skipped."
                 else
-                    targets = compute_targets(probs, sizing, market_state)   # STRATEGY SEAM (placeholder → empty)
-                    prices  = Dict{String,Float64}()                         # decision-time ref prices (from market data)
+                    spine   = load_spine_state(spine_state_path, length(equity_panel.symbols); regime = spine_regime)
+                    targets = compute_targets(spine, equity_panel, capital)   # STRATEGY SEAM → the spine
+                    prices  = Dict(String(equity_panel.symbols[i]) => equity_panel.prices[i]
+                                   for i in eachindex(equity_panel.symbols))
                     res = execute_rebalance!(ctrl, ledger;
                         targets = targets, prices = prices,
-                        signal_id = "daily", regime = regime_name,
+                        signal_id = "spine", regime = regime_name,
                         solve_id = Dates.format(dt, "yyyymmdd"), pool_id = pool)
-                    @info "Rebalance complete" orders=length(res.acks) fills=length(res.fills) reconciled=res.reconciled
+                    save_spine_state(spine_state_path, spine)               # persist per-sleeve vol state
+                    @info "Spine rebalance complete" orders=length(res.acks) fills=length(res.fills) reconciled=res.reconciled
                 end
             finally
                 disconnect!(built.venue)
@@ -183,8 +200,7 @@ function run_daily_recursive()
             0.1   # Jump intensity (placeholder)
         )
 
-        @info "Daily recursive update complete" 
-              regime=argmax([probs.p_fixed, probs.p_growth, probs.p_floating])
+        @info "Daily recursive update complete" regime=argmax([probs.p_fixed, probs.p_growth, probs.p_floating])
 
     catch e
         @error "Daily recursive update failed" exception=e

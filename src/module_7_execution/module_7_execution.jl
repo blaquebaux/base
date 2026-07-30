@@ -10,6 +10,7 @@ export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        ExecutionVenue, VenueOrder, OrderAck, isaccepted, islocked_id,
        connect!, disconnect!, is_connected, submit!, cancel!, positions, drain_fills,
        IBKRVenue, IBKRConfig, IBKRConnection, drain_pending_fills,
+       AlpacaVenue, AlpacaConfig, cancel_all_open!, account_info,
        ExecutionController, submit_governed!, submit_liquidation!, halt!, resume!, reconcile!, rehydrate!,
        apply_fill!, process_fills!, process_and_reconcile!,
        expected_position, positions_snapshot, pool_of,
@@ -405,6 +406,7 @@ end
 include("venue_interface.jl")
 include("ibkr_connection.jl")     # was dead code; now wired. `using Jib` lives inside.
 include("venues/ibkr.jl")
+include("venues/alpaca.jl")       # Plan-B venue over Alpaca REST (paper needs no approval)
 include("execution_controller.jl")
 
 end  # module ExecutionLayer

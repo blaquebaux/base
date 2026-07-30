@@ -9,6 +9,157 @@
   The recovered `data/fetcher.py` is repurposed to source from IBKR instead of Polygon.
 - **Scope: equity-first.** Multi-asset (crypto + other pools) is a **"day-2" item**.
 
+## Decisions locked (2026-07-27) — edge validation + strategy fork
+
+**Edge validation result: NO EDGE.** The recovered alpha was tested out-of-sample on
+60d × 15-min yfinance data (1,547 bars × 60 S&P equities):
+- `factors.py` 3-factor model: **50.94%** accuracy (p=0.48), IC **−0.004**.
+- Bayesian `signal_engine.py`: **50.74%** accuracy (p=0.59), IC **+0.001**.
+Both indistinguishable from a coin flip. The machinery is sound; it does not *predict*
+returns at this sample/horizon.
+
+**Construction can't rescue it.** OOS test of portfolio construction *without* predictive
+alpha (same panel): a market-neutral (net-zero) book returns **~0** regardless of construction
+(equal-weight / min-variance / Six-Sigma Oracle) — no alpha to deploy, no premium to harvest.
+The only positive return observed — long equal-weight, **+15.9%** — is **beta (equity risk
+premium)**, not alpha and not clever construction.
+
+**Corrected role of the Monte Carlo / Six-Sigma engines** — risk *tools*, not edge tools:
+- `monte_carlo_engine.py` (crypto-quant) = forward risk simulator (VaR/CVaR/ES from assumed
+  drift/vol). Right tool to **size a premium by its tail**, wrong tool to find return.
+- `SixSigmaOracle` = weight optimizer on historical *means* (noise) → Markowitz overfitting
+  trap if used for return. Correct use = **survival-sizing**: "at exposure X, what's the
+  six-sigma loss?" → cap gross so it stays under the loss budget (`six_sigma_halt → halt!`).
+
+**FORK DECISION: Path B is the spine; Path A is funded research on top.**
+- **Path A (alpha)** — hunt a *predictive* signal. Uncertain existence (low-base-rate search
+  with real unknown-unknowns), high ceiling, fast decay, capacity-limited. Kept as ongoing R&D;
+  any alpha found plugs into the *same* risk engine for sizing. The market-neutral L/S "Path-A
+  sequence" below is now the **research track**, not the spine.
+- **Path B (premia) = SPINE** — harvest documented *risk premia* (equity; factor tilts
+  value/quality/low-vol/momentum; later carry + vol-risk-premium; diversification). Return
+  source is known and persistent; the **risk stack is the differentiator** (4-lane VaR/CVaR
+  sizing, Six-Sigma survival-sizing, regime risk-timing, governed halt/flatten). Modest ceiling,
+  slow decay, large capacity — you win on **risk management**, not prediction.
+- Path B delivers a live, honest, positive-expected-return platform now; Path A is upside that
+  plugs in if/when it hits. Neither bets the platform on finding alpha.
+
+**Path-B equity-first build (the spine):**
+1. Long-biased US equity book; `factors.py` repurposed as cross-sectional *exposures* (not forecasts).
+2. Risk-budget sizing via `risk_engine` VaR/CVaR → `position_scalar`.
+3. Regime overlay (`risk_intelligence` AdaptiveVol / Gamma-ARMA) → cut gross in high-vol regimes (risk-timing).
+4. Governed Julia `ExecutionController` (built, 346/346) → drawdown halt/flatten = survival layer.
+5. **Validate over a FULL CYCLE** (multi-year, incl. real drawdowns): does the risk-timed book
+   beat buy-and-hold on Sharpe + max-drawdown net of costs? Well-posed and answerable.
+   **No capital before this passes.**
+6. Day-2: carry + vol premia (multi-asset via v1 fleet), risk-parity combine.
+
+**Honest downsides of Path B:** lower Sharpe than a real alpha (~0.3–0.6 single premium, ~1
+diversified); it *eats the tail* (vol/carry left tails — the risk engine mitigates, not
+eliminates); increasingly commoditized (factor ETFs exist) so the edge is the risk overlay +
+combination + execution; correlations converge in crises.
+
+**Path-B validation: PASSED (2026-07-27).** Full-cycle test — 9 SPDR sector ETFs, 27.3y
+(1999–2026, incl. dot-com / GFC / 2011 / 2018-Q4 / COVID / 2022), **net of 2 bps/side**:
+- buy&hold EW: CAGR **+9.2%**, Sharpe 0.58, **maxDD −53%** (GFC −53%, COVID −37%).
+- vol-targeted EW (12% target, 60d realized vol, causal/lagged, cap 1.0, de-risk only):
+  CAGR **+7.2%**, Sharpe **0.67**, Sortino **0.91**, **maxDD −28%** (GFC −25%, COVID −18%),
+  Calmar 0.26.
+Risk-timing **halved max drawdown and every crisis drawdown** and lifted Sharpe +15% /
+Sortino +25% / Calmar +44%, for ~2% CAGR given up sitting in cash (understated — cash earned
+0%; a real T-bill rate closes much of the gap). **BUILD DECISION: keep the vol-target overlay;
+DROP the risk-parity *sector* tilt** — it added nothing (0.67 vs 0.67, −27% vs −28% maxDD) at
+~2× the turnover (339% vs 184%/yr). **Known limit:** vol-targeting is a lagged *crash-cutter*,
+weaker on slow bleeds (2022 −17%→−11%) — pair it with the `risk_intelligence` Gamma-ARMA regime
+signal, not vol alone. The path from single-premium Sharpe ~0.67 toward ~1 is **adding
+uncorrelated premia** (bonds/carry/vol) + risk-parity *across asset classes* (day-2).
+
+**Path-B SYNTHESIS validated (2026-07-27) — THE SPINE.** Diversified inverse-vol base +
+**TREND (12m TSMOM) sleeve** + vol-target overlay, 5 assets (SPY/IEF/TLT/GLD/DBC), 19.4y
+(2007–2026, incl. GFC/COVID/2022), net of costs+financing:
+- **SPINE (base+trend 50/50): Sharpe 0.86, Sortino 1.17, Calmar 0.48, maxDD −11%** — no crisis
+  worse than −7.2% (GFC −7.2%, COVID −5.7%, 2022 −6.3%). vs SPY: Sharpe 0.62, maxDD −55%.
+- **2022 patch confirmed:** the trend sleeve made **+4.4%** (short bonds / long energy) while
+  SPY −18% / 60-40 −16%, cutting the spine's 2022 loss to **−2.8%**. Bonds alone can't do this;
+  trend is the sleeve that survives the positive-stock/bond-correlation regime.
+Honest: Sharpe **0.86 (not 1.0)**; CAGR **+5.4%** (a 6.3%-vol book — lever *modestly* to ~11% vol
+for ~9% CAGR at similar Sharpe; safe here *because* trend caps the tail, unlike the naive
+bond-leverage that failed the (b) test); trend is a hedge/diversifier, not a return engine (long
+flat stretches 2011–2019). **BUILD TARGET (the spine): diversified inverse-vol RP base + TSMOM
+trend sleeve + vol-target overlay + regime cut → governed execution.**
+
+## Implementation status — Path-B spine BUILT (2026-07-27)
+The spine above is now **implemented, tested, and running end-to-end on cached data through the
+governed execution path.** Only the live IBKR data/venue swap remains (blocked on account approval).
+
+| Step | Deliverable | Status |
+|---|---|---|
+| strategy (d-1/d-3) | `src/module_13_portfolio/spine.jl` — `tsmom_signal`/`tsmom_weights`, `voltarget_exposure`, stateful `SpineState`/`spine_step!`/`spine_targets`, `regime_multiplier`; composes existing `ewma_cov`/`risk_parity`/`inverse_variance` | ✅ `test/test_spine.jl` **40/40** |
+| parity (d-2) | stateful port reproduces the study: Sharpe ~0.94–0.99, maxDD −9.9…−10.8%, 2022 −2.8…−3.2%, trend +4.2% in 2022 | ✅ verified |
+| regime (d-5) | `regime_multiplier` (:none/:dd/:vol/:trend/:both); `:dd` default in production (Sharpe 0.94→0.97, cuts crises at ~0 cost) | ✅ |
+| data (d-4) | `src/module_1_data/equity_panel.jl` (`EquityPanel`: swappable `PanelProvider`, `CSVPanelProvider`, `panel_at`) + fixture `scripts/data/sector_panel.csv` | ✅ `test/test_equity_panel.jl` **12/12** |
+| wiring | `scripts/run_daily_recursive.jl` `compute_targets` → spine → governed `execute_rebalance!`; Serialization state persistence; `spine_regime=:dd` | ✅ loads clean |
+| end-to-end | `scripts/spine_end_to_end.jl`: CSV → spine → governed orders → SimVenue fills → SQLite ledger w/ lineage → reconcile | ✅ 12 rebalances, **59 fills w/ AUDIT-001 lineage** |
+| integration test | `test/test_spine_pipeline.jl` — the full pipeline as a registered test (asserts reconcile + lineage every run) | ✅ **11/11** |
+| IBKR adapter (write-ahead) | `src/module_1_data/ibkr_panel.jl` — `IBKRPanelProvider` (Jib `reqHistoricalData`, verified offline) | ⏸ kept as a second venue (IBKR **rejected** the account) |
+| **Plan-B data (Alpaca)** | `src/module_1_data/alpaca_panel.jl` — `AlpacaPanelProvider` (REST v2 daily bars, total-return, paginated) | ✅ compiles; **runnable with paper keys** |
+| **Plan-B venue (Alpaca)** | `src/module_7_execution/venues/alpaca.jl` — `AlpacaVenue` (POST /v2/orders, positions, drain fills; client_order_id idempotency) | ✅ **12/12**; 346/346 controller regression green |
+| **Alpaca paper runner** | `scripts/spine_alpaca_paper.jl` — export paper keys → spine on Alpaca paper end-to-end | ✅ compiles; awaits free paper keys |
+
+**Design facts baked in (verified, not assumed):**
+- Per-sleeve vol-target uses each sleeve's **realized P&L vol** (RiskMetrics span-60), *not* ex-ante
+  asset-Σ vol — the latter throttles the trend hedge exactly when it works (the 2022 lesson). The
+  **stateful two-sleeve** construction is load-bearing; the stateless `spine_weights` under-hedges
+  and is annotated as an approximation.
+- `SpineState` default `regime=:none` reproduces the validated baseline exactly; production defaults `:dd`.
+- Every order-path invariant fired in the end-to-end run (REQ-RISK-003 daily budget → `reset_daily!`
+  per day; AUDIT-001 lineage on every fill; reconciliation clean).
+- Fixed a pre-existing parse bug in `run_daily_recursive.jl` (malformed multi-line `@info`) — the
+  draft runner had never parsed/loaded before.
+
+**Broker pivot — IBKR REJECTED → Alpaca primary (2026-07-27).** IBKR rejected the account
+(funded; no explanation). Pivoted to **Alpaca** (US resident) — the venue-abstraction's payoff:
+`PanelProvider` + `ExecutionVenue` made it a swap, not a rewrite. Alpaca **paper needs no
+account approval**, so this is *runnable now*, further than IBKR ever allowed. The IBKR adapters
+are kept as a ready second venue if the account is ever re-applied.
+
+**To run on Alpaca paper (the only remaining step is free paper keys, no approval):**
+`export ALPACA_KEY_ID=… ALPACA_SECRET_KEY=…` then `julia --project=. scripts/spine_alpaca_paper.jl`.
+That drives the full path — Alpaca data → spine (regime :dd) → governed orders → Alpaca paper
+fills → ledger w/ lineage → reconcile. Everything between data and venue is proven by
+`test/test_spine_pipeline.jl`. **Live money** later = `AlpacaConfig(paper=false)` after standard
+US-KYC approval (lighter than IBKR; Tradier is the US backup) AND governed invariants green.
+The market-neutral L/S "Path-A sequence" below is the **research track**, not the spine.
+
+## Cadence & horizon — DAILY, tested (2026-07-29)
+
+**Intraday cadence tested and rejected.** On 17,659 real Alpaca 15-min bars (2022–2026, incl. the
+2022 bear + Fed cycle), net of costs:
+- Hold the daily spine book *through* the day: **Sharpe 1.24, maxDD −8.4%** — already strong.
+- Intraday vol-brake: **never fired (0% of bars)** — the 5-asset diversified book barely moves
+  intraday even on Fed days (stocks/bonds/gold/commodities offset *within* the bar);
+  diversification IS the intraday shock absorber.
+- Intraday drawdown-brake: fired 4.2%, **hurt** (−1% CAGR, −0.08 Sharpe for −0.7% maxDD) — whipsaw.
+- Full 15-min rebalancing = pure cost drag (risk premia don't change in 15 min; ~34 bps/bar turnover).
+- 15-min *prediction* was directly tested earlier → noise (IC≈0).
+**DECISION: once-daily rebalance, 9:20 ET pre-open.** Revisit only if the book becomes concentrated
+or a real intraday alpha is found.
+
+**Why short-horizon shorting is a reversal trap (momentum vs reversal by horizon).** IC of
+trailing k-day return → next-day return, pooled across the 5 assets, 2006–2026:
+
+| horizon | 1d | 2d | 3d | 5d | 10d | 21d | 63d | 126d | 252d |
+|---|---|---|---|---|---|---|---|---|---|
+| IC | −.038 | **−.041** | −.035 | −.031 | −.021 | −.010 | −.000 | +.005 | +.002 |
+
+Short horizons (1–63d) are **REVERSAL** (negative IC — a 2-day drop tends to *bounce*; 2d is the
+strongest reversal); **MOMENTUM** (positive IC) appears only at 126–252d. This is exactly why the
+trend sleeve uses a **12-month** lookback and correctly ignores 2-day moves. "Short the 2-day
+bloodbath" fights the strongest short-horizon force in the data. The spine shorts *sustained*
+(12-mo) downtrends (e.g. bonds in 2022, +4.4%), and *de-risks* (vol-target + regime brake) on a
+short selloff rather than flipping short. The kill switch (`HALT` file) is a MANUAL/alert stop —
+it does not auto-fire on a drawdown; the auto-response to a selloff is de-risking, not a flat exit.
+
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
 **in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack

@@ -71,4 +71,9 @@ export random_portfolios, resampled_frontier,
 include("backtest.jl")
 export backtest, equal_weight
 
+# ---- spine (validated Path-B strategy) --------------------------------------
+include("spine.jl")
+export tsmom_signal, tsmom_weights, voltarget_exposure, spine_weights, spine_strategy,
+       SpineState, spine_step!, spine_targets, regime_multiplier
+
 end # module
