@@ -12,7 +12,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/malcolmx/Downloads/Blaque Baux and Crypto Quant/blaque_baux_canonical/scripts/run_spine_daily.sh</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_spine_daily.sh</string>
     </array>
 
     <!-- Mon(1) .. Fri(5) at 09:20 local. The wrapper still gates on the Alpaca calendar for holidays. -->
@@ -36,8 +36,8 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/malcolmx/Downloads/Blaque Baux and Crypto Quant/blaque_baux_canonical/logs/launchd.out</string>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd.out</string>
     <key>StandardErrorPath</key>
-    <string>/Users/malcolmx/Downloads/Blaque Baux and Crypto Quant/blaque_baux_canonical/logs/launchd.err</string>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd.err</string>
 </dict>
 </plist>

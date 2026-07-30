@@ -109,7 +109,7 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
 
         res = execute_rebalance!(ctrl, ledger; targets = targets, prices = prices,
             signal_id = "spine", regime = reg, solve_id = Dates.format(panel.asof, "yyyymmdd"),
-            pool_id = pool, settle_secs = 5)
+            pool_id = pool, settle_secs = 20)
         serialize(state_path, state)
 
         if !res.reconciled
