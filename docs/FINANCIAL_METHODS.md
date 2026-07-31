@@ -165,7 +165,7 @@ Every order passes through one governed path (`ExecutionController`) that enforc
 |---|---|
 | **Idempotency** (REQ-EXEC-002) | Client order id = `pool\|symbol\|solve_id`; a repeated solve never double-submits (also deduped broker-side). |
 | **Per-pool budget** (REQ-RISK-003) | Reject if cumulative emitted notional in a pool exceeds its daily budget; reset each trading day. |
-| **Daily loss halt** (REQ-RISK-004) | Halt the pool if realized daily P&L $\le -L_{\max}$. |
+| **Daily loss halt** (REQ-RISK-004) | Halt the pool if realized daily P&L ≤ −L_max. |
 | **Data staleness** (REQ-DATA-003) | Reject emission if the pool's market data is older than a threshold. |
 | **Reconciliation** (REQ-EXEC-003) | Compare fill-driven expected positions to broker positions; on divergence beyond tolerance, halt. |
 | **Kill switch** (REQ-GOV-002) | A manual/alert stop halts all normal emission; liquidation orders bypass it (you must always be able to flatten). |
@@ -214,7 +214,7 @@ A signal is treated as real only if roughly $|\overline{\mathrm{IC}}| > 0.02$ **
 
 On 60-day 15-minute data (≈1,547 bars × 60 S&P names), two candidate alpha models were tested:
 
-| Model | Directional accuracy | $p$ vs 50% | IC |
+| Model | Directional accuracy | p vs 50% | IC |
 |---|---|---|---|
 | 3-factor cross-sectional | 50.9% | 0.48 | −0.004 |
 | Bayesian (Kalman/NIG/James–Stein/ADVI) | 50.7% | 0.59 | +0.001 |
@@ -231,7 +231,7 @@ All figures are historical backtests, net of ~2 bps/side costs, on the reference
 
 IC of a trailing $k$-day return against the next-day return, pooled across assets, 2006–2026:
 
-| $k$ | 1d | 2d | 3d | 5d | 10d | 21d | 63d | 126d | 252d |
+| k | 1d | 2d | 3d | 5d | 10d | 21d | 63d | 126d | 252d |
 |---|---|---|---|---|---|---|---|---|---|
 | IC | −.038 | **−.041** | −.035 | −.031 | −.021 | −.010 | −.000 | +.005 | +.002 |
 
@@ -261,7 +261,7 @@ $$ r^{L}_t = L\, r_t - (L-1)\,\frac{f}{\mathrm{ppy}} . $$
 
 2007–2026, financing at 3% (the friendliest case) vs. 6.5% (today's retail margin):
 
-| $L$ | CAGR @3% | CAGR @6.5% | Vol | Sharpe | Max DD |
+| L | CAGR @3% | CAGR @6.5% | Vol | Sharpe | Max DD |
 |---|---|---|---|---|---|
 | 1.0 | +5.9% | +5.9% | 6.1% | 0.97 | −10.6% |
 | 1.5 | +7.2% | +5.4% | 9.2% | 0.81 | −18.1% |
@@ -337,7 +337,7 @@ The whole stack is exposed over HTTP for a dashboard or an external caller — `
 | Endpoint | Returns |
 |---|---|
 | `POST /optimize` | one strategy's weights (min-var, max-Sharpe, risk-parity, min-CVaR, …) |
-| `POST /frontier` | efficient frontier ($n$ points) |
+| `POST /frontier` | efficient frontier (n points) |
 | `POST /resampled_frontier` | Michaud resampled frontier (§9.5) |
 | `POST /backtest` | walk-forward backtest of a chosen strategy |
 | `POST /metrics` | performance metrics (§4) for a return series |
