@@ -1,5 +1,13 @@
 <title>Blaque Baux — Harvesting Risk, Not Return</title>
 <style>
+  @page{ margin:16mm 14mm; }
+  @media print{
+    :root{ color-scheme:light; }
+    body{ background:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .wrap{ max-width:100% !important; padding:0 !important; }
+    figure,table,.eq,.abstract,.foot{ break-inside:avoid; page-break-inside:avoid; }
+    h2{ break-after:avoid; page-break-after:avoid; }
+  }
   :root{
     --bg:#eef1f5; --surface:#fff; --surface2:#f7f9fb; --ink:#0e1726; --muted:#54637a; --faint:#8a99ad;
     --line:#dde3ec; --accent:#0f8f6f; --pos:#0f8f6f; --neg:#d9534a;
