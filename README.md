@@ -129,6 +129,30 @@ test/                    gate + (quarantined legacy) suites
 - Real capital has **not** been deployed. The legacy Gamma-ARMA base modules (a separate research
   lineage) are quarantined from the test gate; see `test/runtests.jl`.
 
+## Roadmap & archived work
+
+This repository is the **canonical, validated core**. A larger body of earlier and exploratory work
+is preserved *outside* the repo (a local `Archive/` tree) for provenance — it is **not published here
+and not wired into the live path**. It's catalogued so the lineage is clear and so the honest
+"what's next" is on the record:
+
+- **Crypto-Quant MVP** *(archived)* — a Streamlit app with a natural-language (LLM) interface for
+  cryptocurrency portfolio risk analysis via Monte-Carlo simulation. A plausible future *front-end /
+  product* direction; it is a separate prototype, never connected to the spine. Today crypto appears
+  in the core only as a **risk input** (Deribit BTC volatility) — see `data_feeds_production.jl`.
+- **Alpha research track** *(archived; see [`FINANCIAL_METHODS.md` §10](docs/FINANCIAL_METHODS.md))* —
+  a Bayesian return-estimation engine and a Monte-Carlo / "Six-Sigma Oracle" risk engine. The math is
+  sound but measured **no predictive edge** at the horizons tested, which is *why* the live strategy
+  harvests risk premia instead. This is "Path A" — kept as funded-research material, not production.
+- **Earlier prototypes** *(archived)* — Python builds (`v1`/`v2`/`polyglot`) and a standalone
+  optimizer service, all **superseded** by this Julia core (the in-repo `portfolio_server.jl` replaces
+  the old optimizer service).
+
+**Direction of travel:** the near-term roadmap is depth on the validated core (broader instrument
+universe, live-money graduation off paper, more governance coverage), *not* re-adopting archived
+components. Anything from the archive returns only if it clears the same out-of-sample edge bar the
+core was held to (§7). No archived component has cleared it yet — and this README will say so until one does.
+
 ## Contributing / using this
 
 You're welcome to study, fork, and build on this. If you deploy real capital, **validate
