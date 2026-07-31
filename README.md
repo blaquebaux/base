@@ -52,6 +52,30 @@ trade-off) — is specified with formulas and code references in:
 
 Architecture and design decisions: [`docs/CANONICAL_ARCHITECTURE.md`](docs/CANONICAL_ARCHITECTURE.md).
 
+## Beyond the spine — a portfolio-optimization toolkit
+
+The spine is one strategy built on a **general-purpose optimization library** (`src/module_13_portfolio/`,
+module `PortfolioOpt`) that is useful on its own:
+
+- **Optimizers** — mean-variance (min-variance, max-Sharpe, efficient frontier), **Black–Litterman**,
+  risk parity / HRP / max-diversification, **tail-risk** (min-CVaR / min-CDaR via Rockafellar–Uryasev
+  LPs), and **cost-aware** mean-variance (trades from current holdings with linear + impact penalties).
+- **Monte-Carlo robustification** (`robust.jl`) — Gaussian / IID / block / stationary bootstrap and
+  Student-t data-generating processes feeding a **Michaud resampled frontier** and a feasible-set
+  Monte-Carlo cloud. This is MC used to *defend against estimation error*, not to forecast price.
+- **A REST service** (`scripts/portfolio_server.jl`, JSON on `:8766`) with a Python **Dash** dashboard
+  (`scripts/dashboard.py`): `/optimize`, `/frontier`, `/resampled_frontier`, `/backtest`, `/metrics`,
+  `/random_portfolios`.
+
+```bash
+julia --project=. scripts/portfolio_server.jl     # optimizer backend on :8766
+python scripts/dashboard.py                        # dashboard UI on :8050
+```
+
+Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
+*(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
+`module_1_data/data_feeds_production.jl`; the spine trades ETFs, not crypto assets.)*
+
 ## Quickstart
 
 Requires Julia (1.10+). From the repo root:

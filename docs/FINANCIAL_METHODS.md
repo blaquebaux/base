@@ -272,7 +272,88 @@ Two facts: (i) **Sharpe only falls with leverage** (financing is a pure drag on 
 
 ---
 
-## 9. The research track (Python) — archived, and why
+## 9. The portfolio-optimization library — optimizers, Monte-Carlo robustification, and a service
+
+The spine (§3) is one strategy built on a **general-purpose optimization library**. `module_13_portfolio` (`PortfolioOpt`) is usable on its own: every optimizer consumes the moments/covariance of §1–2 (or a raw return matrix) and returns budget-constrained weights. Convex programs are solved with **JuMP** and the **Clarabel** conic solver; a long-only toggle and scalar/vector box bounds are shared across the family.
+
+> **Caveat, stated up front.** Any optimizer that consumes expected returns $\mu$ (§9.1, §9.2) inherits the Markowitz *error-maximization* problem — it over-fits noise in the sample mean. That is *why* the flagship spine avoids $\mu$ entirely (§3), and why this library ships the antidotes next to the optimizers: shrinkage (§2), equilibrium anchoring (§9.2), and Monte-Carlo resampling (§9.5).
+
+### 9.1 Markowitz family (`meanvariance.jl`)
+
+Quadratic programs over $\sum_i w_i = 1$ with optional long-only and box constraints:
+
+- **Minimum variance:** $\min_w\ w^\top\hat\Sigma w$ — the one member that uses no $\mu$, hence the robust one.
+- **Maximum Sharpe** (tangency): $\max_w\ \dfrac{\mu^\top w - r_f}{\sqrt{w^\top\hat\Sigma w}}$, via the standard convex reformulation.
+- **Mean-variance:** $\max_w\ \mu^\top w - \tfrac{\gamma}{2}\, w^\top\hat\Sigma w$ (risk-aversion $\gamma$) or $\min_w\ w^\top\hat\Sigma w$ s.t. $\mu^\top w \ge r^\star$ (target-return).
+- **Efficient frontier:** the target-return sweep across $n$ points.
+
+### 9.2 Black–Litterman (`blacklitterman.jl`)
+
+Anchor on the market and blend in views, rather than trusting raw sample means. Reverse-optimize the equilibrium prior from market-cap weights,
+
+$$ \Pi = \delta\,\hat\Sigma\, w_{\text{mkt}}, $$
+
+then form the posterior from $K$ views $(P, Q)$ with view-uncertainty $\Omega$ and prior scaling $\tau$:
+
+$$ \mu_{\text{BL}} = \Big[(\tau\hat\Sigma)^{-1} + P^\top\Omega^{-1}P\Big]^{-1}\Big[(\tau\hat\Sigma)^{-1}\Pi + P^\top\Omega^{-1}Q\Big], \qquad \Sigma_{\text{BL}} = \hat\Sigma + \Big[(\tau\hat\Sigma)^{-1} + P^\top\Omega^{-1}P\Big]^{-1}. $$
+
+`make_view` builds a row of $P$ with its $Q$ entry ("these assets will return $q$"); the posterior $(\mu_{\text{BL}},\Sigma_{\text{BL}})$ then feeds any §9.1 optimizer. Omitting $\Omega$ defaults it to $\operatorname{diag}(P\,\tau\hat\Sigma\,P^\top)$.
+
+### 9.3 Tail-risk optimizers (`tailrisk.jl`)
+
+These shape the *realized* loss distribution from the scenario matrix $R$ (not a Gaussian proxy). **Minimum CVaR** uses the Rockafellar–Uryasev linear program: at level $\alpha$,
+
+$$ \min_{w,\zeta,u}\ \zeta + \frac{1}{(1-\alpha)T}\sum_{t=1}^{T} u_t \quad\text{s.t.}\quad u_t \ge -R_{t,\cdot}\,w - \zeta,\ \ u_t \ge 0,\ \ \textstyle\sum_i w_i = 1, $$
+
+optionally with a return floor $\mu^\top w \ge r^\star$. It remains an **LP** regardless of scenario count. **Minimum CDaR** is the drawdown analogue (conditional drawdown-at-risk).
+
+### 9.4 Cost-aware optimization (`costaware.jl`)
+
+Decide what to *trade to* given current holdings $w_0$, so cost shapes the solution instead of being measured afterward:
+
+$$ \text{turnover} = \sum_i |w_i - w_{0,i}|, \qquad \text{cost}(w_0\!\to\!w) = c_{\text{lin}}\!\sum_i|\Delta_i| \;+\; c_{\text{imp}}\!\sum_i \Delta_i^2, \qquad \Delta_i = w_i - w_{0,i}, $$
+
+and `mean_variance_tc` maximizes $\mu^\top w - \tfrac{\gamma}{2} w^\top\hat\Sigma w - \text{cost}(w_0\!\to\!w)$ — a linear (spread/commission) plus convex (market-impact) penalty *inside* the objective.
+
+### 9.5 Monte-Carlo robustification (`robust.jl`)
+
+This is the platform's Monte Carlo — used to **defend against estimation error**, not to forecast price. A data-generating process is a pluggable sampler `(R, T_sim) -> simulated returns`:
+
+- `gaussian_dgp` — draw from $\mathcal N(\hat\mu,\hat\Sigma)$;
+- `iid_bootstrap` — resample whole rows with replacement (nonparametric; preserves the cross-sectional dependence);
+- `block_bootstrap(block)` — circular blocks (preserves short-horizon autocorrelation);
+- `stationary_bootstrap(meanblock)` — Politis–Romano geometric block lengths;
+- `student_t_dgp(ν)` — fat-tailed multivariate-$t$ scaled to $\hat\Sigma$.
+
+Two consumers:
+
+- **Feasible-set Monte Carlo** (`random_portfolios`): sample many admissible weight vectors to trace the achievable risk/return cloud — the dashboard's scatter, and a sanity check on any optimizer's output.
+- **Resampled (Michaud) efficient frontier** (`resampled_frontier`): for each of $n_{\text{resample}}$ draws, simulate $T_{\text{sim}}$ returns from the sampler, compute that draw's frontier, and **average the weights** across draws. The averaged frontier is markedly more stable out-of-sample than the single-shot Markowitz frontier — the direct antidote to §9.1's error-maximization.
+
+### 9.6 The optimizer as a service (`scripts/`)
+
+The whole stack is exposed over HTTP for a dashboard or an external caller — `portfolio_server.jl` (JSON REST, default `127.0.0.1:8766`) with a Python **Dash** frontend (`dashboard.py`):
+
+| Endpoint | Returns |
+|---|---|
+| `POST /optimize` | one strategy's weights (min-var, max-Sharpe, risk-parity, min-CVaR, …) |
+| `POST /frontier` | efficient frontier ($n$ points) |
+| `POST /resampled_frontier` | Michaud resampled frontier (§9.5) |
+| `POST /backtest` | walk-forward backtest of a chosen strategy |
+| `POST /metrics` | performance metrics (§4) for a return series |
+| `POST /random_portfolios` | feasible-set Monte-Carlo cloud (§9.5) |
+| `GET /health` | liveness |
+
+```bash
+julia --project=. scripts/portfolio_server.jl     # backend on :8766
+python scripts/dashboard.py                        # Dash UI on :8050
+```
+
+This makes the repository usable as a **general portfolio-optimization library and service**, with the spine as the flagship strategy built on top of it. (A production data layer — `module_1_data/data_feeds_production.jl` — can feed it live inputs including a **Deribit BTC volatility-index** signal; crypto enters as a risk input, not as a traded sleeve.)
+
+---
+
+## 10. The research track (Python) — archived, and why
 
 The platform began as an alpha-prediction system. That code is preserved (archived) because the mathematics is sound, but it is **not on the live path** — edge validation (§7) found no predictive signal at the horizons tested. Documented honestly:
 
@@ -284,7 +365,7 @@ The lesson, stated once: sophisticated machinery (long/short, QP optimization, M
 
 ---
 
-## 10. Code map
+## 11. Code map
 
 | Concept (§) | File · key symbols |
 |---|---|
@@ -292,7 +373,10 @@ The lesson, stated once: sophisticated machinery (long/short, QP optimization, M
 | Base weights (§3.1) | `src/module_13_portfolio/riskbased.jl` · `inverse_variance`, `risk_parity`, `max_diversification`, `hrp_weights` |
 | Spine: trend, vol-target, blend, regime, stateful (§3.2–3.5) | `src/module_13_portfolio/spine.jl` · `tsmom_signal`, `tsmom_weights`, `voltarget_exposure`, `regime_multiplier`, `SpineState`, `spine_step!`, `spine_targets` |
 | Metrics, VaR/CVaR (§4) | `src/module_13_portfolio/metrics.jl` · `sharpe`, `sortino`, `max_drawdown`, `calmar`, `value_at_risk`, `expected_shortfall` |
-| Mean-variance / CVaR / Black-Litterman | `meanvariance.jl`, `tailrisk.jl`, `blacklitterman.jl` |
+| Optimizer library — Markowitz / BL / tail-risk / cost-aware (§9.1–9.4) | `meanvariance.jl` · `min_variance`, `max_sharpe`, `mean_variance`, `efficient_frontier`; `blacklitterman.jl` · `black_litterman`, `implied_equilibrium_returns`, `make_view`; `tailrisk.jl` · `min_cvar`, `min_cdar`; `costaware.jl` · `mean_variance_tc`, `transaction_cost`, `turnover` |
+| Monte-Carlo robustification (§9.5) | `src/module_13_portfolio/robust.jl` · `gaussian_dgp`, `iid_bootstrap`, `block_bootstrap`, `stationary_bootstrap`, `student_t_dgp`, `random_portfolios`, `resampled_frontier` |
+| Optimizer REST service + dashboard (§9.6) | `scripts/portfolio_server.jl`, `scripts/dashboard.py` |
+| Production data feeds (Cboe / FRED / Deribit crypto-vol) | `src/module_1_data/data_feeds_production.jl` |
 | Purged / combinatorial CV (§7.2) | `src/module_11_cv/` |
 | Governed execution invariants (§5) | `src/module_7_execution/` · `execution_controller.jl`, `venue_interface.jl`, `venues/` |
 | Layer-3 safety gate (§5.1) | `src/module_8_governance/safety_gate.jl` · `SafetyLimits`, `preflight`, `drawdown` |
@@ -303,7 +387,7 @@ The lesson, stated once: sophisticated machinery (long/short, QP optimization, M
 
 ---
 
-## 11. References
+## 12. References
 
 1. Markowitz, H. (1952). *Portfolio Selection.* J. Finance.
 2. J.P. Morgan/Reuters (1996). *RiskMetrics — Technical Document* (EWMA covariance, VaR).
@@ -316,9 +400,12 @@ The lesson, stated once: sophisticated machinery (long/short, QP optimization, M
 9. Cornish, E., & Fisher, R. (1938). *Moments and Cumulants…* (Cornish–Fisher VaR expansion).
 10. Sortino, F., & Price, L. (1994). *Performance Measurement in a Downside Risk Framework.*
 11. Rockafellar, R. T., & Uryasev, S. (2000). *Optimization of Conditional Value-at-Risk.*
+12. Black, F., & Litterman, R. (1992). *Global Portfolio Optimization.* Financial Analysts Journal.
+13. Michaud, R. (1998). *Efficient Asset Management* (resampled efficiency).
+14. Politis, D., & Romano, J. (1994). *The Stationary Bootstrap.* J. American Statistical Association.
 
 ---
 
-## 12. Disclaimer
+## 13. Disclaimer
 
 This document and the accompanying code are provided for **educational and research purposes**. They do not constitute investment advice, a solicitation, or an offer. Performance figures are historical simulations or paper-trading results, net of modeled transaction costs and (where noted) financing; they are **not indicative of future results**. Systematic trading carries substantial risk, including loss of principal. Anyone deploying real capital does so at their own risk and should conduct independent validation.
