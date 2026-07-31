@@ -191,6 +191,35 @@ not a config tweak. Caveat: validated on 2016–2026 only (no GFC); DBA rests as
 prior as on the backtest. Wired into `scripts/spine_live.jl` `UNIVERSE`; a self-healing state-migration
 guard resizes the persisted vol-state on any universe change.
 
+## Split-universe spine — BUILT + validated (2026-07-31)
+
+The single-universe spine runs both sleeves on the same assets, but they want different universes:
+the long-only **base** wants risk-premium assets to harvest passively; the long/short **trend**
+sleeve wants **breadth** — many *independent* markets so something is always trending. The
+split-universe spine gives each its own universe and blends the vol-targeted sleeves onto the union.
+
+- **Base (6):** SPY, IEF, TLT, GLD, DBC, DBA (long-only inverse-vol).
+- **Trend (11):** SPY, IEF, TLT, GLD, DBA + DBB, DBE, SLV, UUP, FXE, FXY (long/short 12-mo TSMOM) —
+  adds base-metals, energy, silver, and three currencies (all 0.38–0.51 corr to the classics), giving
+  trend genuinely independent markets. FX/single-commodities are *deliberately not* in the base sleeve
+  (no long-run premium to harvest long-only).
+
+Validated on 2016–2026 (faithful backtest, net of 2 bps turnover):
+
+| Configuration | CAGR | Vol | Sharpe | Sortino | maxDD | Calmar |
+|---|---|---|---|---|---|---|
+| Single +DBA (6, current prod) | 5.9% | 5.7% | 1.04 | 1.45 | −8.9% | 0.66 |
+| **Split base6 / trend11 (50/50)** | 5.5% | **5.1%** | **1.07** | **1.49** | **−8.4%** | 0.65 |
+| Split base6 / trend11 (60/40) | 5.8% | 5.3% | 1.09 | 1.53 | −8.3% | 0.71 |
+
+The broad trend sleeve is a smoother, more reliable hedge → lower vol (5.7→5.1%) and shallower
+drawdown at equal/better return. **Status: built, not yet on the live path.** Implemented as
+`SplitSpineState` / `split_spine_step!` / `split_indices` in `spine.jl` (9 unit tests in
+`test/test_spine.jl`), with a ready driver `scripts/spine_live_split.jl` that uses its **own** state
+file (`spine_state_split.jls`) and identical governance — so it can be paper-run alongside the single
+spine, then adopted by repointing the launchd wrapper. Default blend 50/50 (untuned; 60/40 was
+marginally better but avoid overfitting the blend). Caveat: 2016–2026 only (no GFC).
+
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
 **in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack

@@ -29,6 +29,7 @@ export simple_returns, log_returns, mean_returns,
        student_t_dgp, t_copula_dgp,
        backtest, equal_weight,
        tsmom_signal, tsmom_weights, voltarget_exposure, spine_weights, spine_strategy,
-       SpineState, spine_step!, spine_targets, regime_multiplier
+       SpineState, spine_step!, spine_targets, regime_multiplier,
+       SplitSpineState, split_spine_step!, split_indices
 
 end # module PortfolioOptModule

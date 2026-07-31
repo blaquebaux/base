@@ -287,3 +287,110 @@ function spine_targets(w::AbstractVector, symbols::AbstractVector,
     return Dict{String,Float64}(String(symbols[i]) => w[i] * capital / prices[i]
                                 for i in eachindex(w))
 end
+
+# =============================================================================
+# Split-universe spine — base and trend sleeves on DIFFERENT universes.
+#
+# The single-universe spine runs both sleeves on the same assets. But the two
+# sleeves want different things: the long-only *base* wants risk-premium assets
+# (equity/bonds/gold/broad commodities) to harvest passively; the long/short
+# *trend* sleeve wants BREADTH — many *independent* markets (FX, single-commodity
+# complexes) so that at any time something is trending. The split spine gives each
+# its own universe and blends the sized sleeves onto the union.
+#
+# Validated 2016-2026 (faithful backtest, net of costs): vs the single-universe
+# +DBA spine (Sharpe 1.04, vol 5.7%, maxDD -8.9%), the split (base = 6 asset-class
+# ETFs, trend = 11 CTA markets) delivered Sharpe 1.07, vol 5.1%, maxDD -8.4% at
+# 50/50 — a smoother, better-diversified book. See docs/CANONICAL_ARCHITECTURE.md.
+#
+# The window passed to `split_spine_step!` covers the UNION universe; `base_idx` /
+# `trend_idx` select each sleeve's columns (build them with `split_indices`).
+# =============================================================================
+
+"""
+    split_indices(union_symbols, base_symbols, trend_symbols) -> (base_idx, trend_idx)
+
+Column indices (into `union_symbols`) for each sleeve. Every base/trend symbol must
+appear in `union_symbols` (the union the panel is built over).
+"""
+function split_indices(union_syms::AbstractVector, base_syms::AbstractVector,
+                       trend_syms::AbstractVector)
+    pos = Dict(String(s) => i for (i, s) in enumerate(union_syms))
+    bi = [pos[String(s)] for s in base_syms]
+    ti = [pos[String(s)] for s in trend_syms]
+    return bi, ti
+end
+
+"""
+    SplitSpineState(base_idx, trend_idx; sleeve_vol=0.08, cap=1.5, base_weight=0.5,
+                    halflife=21, mom_lookback=252, vol_span=60, base=:invvol, regime=:dd)
+
+Stateful two-sleeve spine where the base runs on `base_idx` and the trend on `trend_idx`
+(column indices into a union-universe panel; overlap is allowed and expected — shared assets
+receive both sleeves' contributions). Persist across daily runs, exactly like `SpineState`.
+"""
+mutable struct SplitSpineState
+    sleeve_vol::Float64
+    cap::Float64
+    base_weight::Float64
+    halflife::Float64
+    mom_lookback::Int
+    vol_span::Int
+    base::Symbol
+    regime::Symbol
+    base_idx::Vector{Int}
+    trend_idx::Vector{Int}
+    base_s2::Float64
+    trend_s2::Float64
+    base_w::Vector{Float64}
+    trend_w::Vector{Float64}
+    n::Int
+end
+
+function SplitSpineState(base_idx::AbstractVector{<:Integer}, trend_idx::AbstractVector{<:Integer};
+                         sleeve_vol::Real = 0.08, cap::Real = 1.5, base_weight::Real = 0.5,
+                         halflife::Real = 21, mom_lookback::Int = 252, vol_span::Int = 60,
+                         base::Symbol = :invvol, regime::Symbol = :dd)
+    SplitSpineState(sleeve_vol, cap, base_weight, halflife, mom_lookback, vol_span, base, regime,
+                    collect(Int, base_idx), collect(Int, trend_idx),
+                    0.0, 0.0, zeros(length(base_idx)), zeros(length(trend_idx)), 0)
+end
+
+"""
+    split_spine_step!(state, window) -> Vector
+
+Advance the split-universe spine one bar and return the target book over the **union**
+universe (length = `size(window, 2)`). `window` is the trailing `T x N` union return matrix
+whose last row is the just-realized bar. Same order of operations as `spine_step!`, but each
+sleeve is computed on its own columns and both are accumulated into the union book; the regime
+brake reads the base sleeve's market proxy.
+"""
+function split_spine_step!(s::SplitSpineState, window::AbstractMatrix)
+    λ = 1 - 2 / (s.vol_span + 1)
+    N = size(window, 2)
+    last_bar = @view window[end, :]
+
+    if s.n > 0                                          # 1. fold realized bar per sleeve
+        rb = dot(s.base_w,  @view last_bar[s.base_idx])
+        rt = dot(s.trend_w, @view last_bar[s.trend_idx])
+        s.base_s2  = s.n == 1 ? rb^2 : λ * s.base_s2  + (1 - λ) * rb^2
+        s.trend_s2 = s.n == 1 ? rt^2 : λ * s.trend_s2 + (1 - λ) * rt^2
+    end
+
+    Wb = window[:, s.base_idx]                          # 2. fresh weights on each sub-universe
+    Σb = ewma_cov(Wb; halflife = s.halflife); σb = sqrt.(diag(Σb))
+    base_w  = _base_weights(s.base, Σb, σb)
+    Wt = window[:, s.trend_idx]
+    σt = sqrt.(diag(ewma_cov(Wt; halflife = s.halflife)))
+    trend_w = tsmom_weights(σt, tsmom_signal(Wt; lookback = s.mom_lookback))
+
+    expo(s2) = (s.n == 0 || s2 <= eps()) ? s.cap :      # 3. per-sleeve vol-target
+               min(s.cap, s.sleeve_vol / sqrt(s2 * 252))
+
+    book = zeros(N)                                      # 4. accumulate both sleeves onto the union
+    @views book[s.base_idx]  .+= s.base_weight       .* (expo(s.base_s2)  .* base_w)
+    @views book[s.trend_idx] .+= (1 - s.base_weight) .* (expo(s.trend_s2) .* trend_w)
+
+    s.base_w = base_w; s.trend_w = trend_w; s.n += 1
+    return regime_multiplier(window[:, s.base_idx], s.regime) .* book   # 5. regime gross overlay
+end

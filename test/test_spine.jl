@@ -141,4 +141,33 @@ end
     @test sum(abs, wdd) < sum(abs, wn)
 end
 
+@testset "split-universe spine — sleeves on different universes" begin
+    # union A,B,C,D ; base = A,B,C (long-only) ; trend = B,C,D (long/short)
+    union = ["A", "B", "C", "D"]
+    bi, ti = split_indices(union, ["A", "B", "C"], ["B", "C", "D"])
+    @test bi == [1, 2, 3]
+    @test ti == [2, 3, 4]
+
+    # A up, B up, C down, D down (D is trend-only and downtrending → should be shorted)
+    R = hcat(fill(0.004, 300), fill(0.004, 300), fill(-0.004, 300), fill(-0.006, 300))
+
+    st = SplitSpineState(bi, ti; base_weight = 0.5, regime = :none)
+    w = split_spine_step!(st, R)
+    @test length(w) == 4                         # book spans the union
+    @test w[1] > 0                               # A: base-only, long-only base ⇒ positive
+    @test w[4] < 0                               # D: trend-only, downtrend ⇒ short
+    @test length(st.base_w) == 3 && length(st.trend_w) == 3
+
+    # base_weight extremes isolate each sleeve's footprint
+    w_allbase  = split_spine_step!(SplitSpineState(bi, ti; base_weight = 1.0, regime = :none), R)
+    @test w_allbase[4] == 0.0                     # trend-only asset gets nothing when base_weight=1
+    w_alltrend = split_spine_step!(SplitSpineState(bi, ti; base_weight = 0.0, regime = :none), R)
+    @test w_alltrend[1] == 0.0                    # base-only asset gets nothing when base_weight=0
+
+    # two-step walk stays finite and updates the per-sleeve vol state
+    st2 = SplitSpineState(bi, ti; regime = :dd)
+    split_spine_step!(st2, R[1:299, :]); w2 = split_spine_step!(st2, R)
+    @test all(isfinite, w2) && st2.n == 2 && st2.base_s2 > 0
+end
+
 end # module
