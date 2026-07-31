@@ -24,7 +24,12 @@ include(joinpath(REPO, "src/module_8_governance/safety_gate.jl"))
 using .ExecutionLayer, .FeedbackLayer, .PortfolioOptModule, .EquityPanel, .AlpacaPanel, .SafetyGate
 include(joinpath(REPO, "scripts/live_execution.jl"))
 
-const UNIVERSE     = ["SPY", "IEF", "TLT", "GLD", "DBC"]
+# DBA (agriculture) added 2026-07-31 as the one genuinely-uncorrelated sleeve (0.44 corr to DBC;
+# everything else tested — intl/EM equity, credit, REITs, silver — carried 0.66-0.84 equity/rate
+# beta and did not diversify). Backtest 2016-2026: Sharpe 0.94->1.04, CAGR 5.4%->5.9%, maxDD ~flat.
+# Caveat: validated on 2016-2026 only (no GFC); the economic case (weather/supply-driven, orthogonal
+# to financial risk) is the stronger justification. See docs/CANONICAL_ARCHITECTURE.md.
+const UNIVERSE     = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA"]
 const LIVE_SENTINEL = "I_UNDERSTAND_THIS_IS_REAL_MONEY"
 
 _readf(p) = isfile(p) ? (v = tryparse(Float64, strip(read(p, String))); v === nothing ? NaN : v) : NaN
@@ -65,6 +70,17 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
 
         state    = isfile(state_path) ? deserialize(state_path)::SpineState :
                                         SpineState(length(universe); regime = regime)
+        # Self-healing guard: if the persisted vol-state was built for a different universe size
+        # (an asset was just added/removed), its per-sleeve weight vectors won't match the new
+        # panel width. Migrate — but PRESERVE the scalar vol levels (base_s2/trend_s2/n) so the
+        # per-sleeve vol-target stays warm and the first post-change book is NOT sized at full cap;
+        # only the resized weight vectors reset (a one-bar, negligible fold-in effect).
+        if length(state.base_w) != length(universe)
+            @warn "universe size changed ($(length(state.base_w)) -> $(length(universe))); migrating spine vol-state (vol levels preserved, weights resized)"
+            migrated = SpineState(length(universe); regime = regime)
+            migrated.base_s2, migrated.trend_s2, migrated.n = state.base_s2, state.trend_s2, state.n
+            state = migrated
+        end
         w        = spine_step!(state, panel.returns)
         reg      = regime_multiplier(panel.returns, :dd) < 1.0 ? "risk-off" : "normal"
         targets  = spine_targets(w, panel.symbols, panel.prices, capital)

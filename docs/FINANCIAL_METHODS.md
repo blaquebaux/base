@@ -29,7 +29,7 @@ $$ r_{t,i} = \frac{P_{t,i}}{P_{t-1,i}} - 1 . $$
 - $w_t \in \mathbb{R}^N$ is the target weight vector at time $t$ (fractions of capital; may be negative for shorts; $\sum_i |w_{t,i}|$ is **gross** exposure, $\sum_i w_{t,i}$ is **net**).
 - Annualization uses $\mathrm{ppy}$ periods per year (252 for daily).
 
-Reference universe (US ETFs, chosen for long history and low survivorship bias): **SPY** (US equity), **IEF** (7–10y Treasuries), **TLT** (20y+ Treasuries), **GLD** (gold), **DBC** (broad commodities).
+Reference universe (US ETFs, chosen for long history and low survivorship bias): **SPY** (US equity), **IEF** (7–10y Treasuries), **TLT** (20y+ Treasuries), **GLD** (gold), **DBC** (broad commodities). The core validation figures below use these five (2007–2026). *Production adds a sixth, **DBA** (agriculture), the one sleeve found to be genuinely uncorrelated (0.44 daily-return corr to DBC vs 0.66–0.84 for tested equity/credit/REIT/silver candidates); on 2016–2026 it lifted the spine's Sharpe 0.94→1.04 at ~flat drawdown — see [`CANONICAL_ARCHITECTURE.md`](CANONICAL_ARCHITECTURE.md), "Universe extension." It rests as much on the economic case (weather/supply-driven risk) as on the shorter backtest.*
 
 ---
 

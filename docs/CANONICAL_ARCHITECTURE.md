@@ -160,6 +160,37 @@ bloodbath" fights the strongest short-horizon force in the data. The spine short
 short selloff rather than flipping short. The kill switch (`HALT` file) is a MANUAL/alert stop —
 it does not auto-fire on a drawdown; the auto-response to a selloff is de-risking, not a flat exit.
 
+## Universe extension — DBA added (2026-07-31)
+
+Tested whether adding sleeves diversifies the spine, on real 2016–2026 SIP data through the faithful
+stateful spine. **Finding: correlation, not count, is what matters.** Of the candidates asked about,
+most were *not* independent of the existing five — daily-return correlations: intl-equity EFA 0.84,
+silver SLV 0.78, HY-credit HYG 0.77, TIPS TIP 0.77, EM-equity EEM 0.74, REITs VNQ 0.69, IG-credit
+LQD 0.66 (all to SPY/IEF/GLD). They are leveraged variants of equity/rate risk already held, and in
+a 2008-style crisis their correlations go to ~1 — adding them left Sharpe ~flat (0.94→0.96) and
+drawdown slightly *worse*.
+
+**Genuinely orthogonal markets** were the commodity complexes and currencies: agriculture DBA 0.44,
+base-metals DBB 0.48, USD UUP 0.43, EUR FXE 0.38, JPY FXY 0.51 (energy DBE 0.93 is redundant — DBC
+is energy-heavy). Backtest deltas (2016–2026, net of 2 bps turnover):
+
+| Universe | CAGR | Sharpe | Sortino | maxDD | Calmar |
+|---|---|---|---|---|---|
+| Baseline (5) | 5.4% | 0.94 | 1.30 | −8.5% | 0.64 |
+| **+DBA (6, adopted)** | **5.9%** | **1.04** | **1.45** | −8.9% | 0.66 |
+| Commodity complexes (8) | 6.2% | 1.05 | 1.45 | −10.4% | 0.59 |
+| CTA-broad +FX (11) | 4.6% | 1.00 | 1.38 | −8.1% | 0.57 |
+
+**Decision: add DBA only.** It is the single clean win — Sharpe 0.94→1.04 at ~flat drawdown, and the
+economic case is strong (agriculture is weather/supply-driven, orthogonal to financial risk). The
+broader sets are mixed: FX lowers vol *and* return (currencies have no long-run premium for the
+long-only base sleeve), and extra commodity ETFs add concentration/drawdown. The trend sleeve alone
+*does* benefit from breadth (Sharpe 0.54→0.60 baseline→CTA-broad), which points at the real future
+lever — a **split-universe** spine (risk-premium base + broad managed-futures trend), a design change,
+not a config tweak. Caveat: validated on 2016–2026 only (no GFC); DBA rests as much on the economic
+prior as on the backtest. Wired into `scripts/spine_live.jl` `UNIVERSE`; a self-healing state-migration
+guard resizes the persisted vol-state on any universe change.
+
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
 **in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack
