@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- End-of-day P&L attribution snapshot. Runs Mon-Fri at 16:10 local (= 16:10 ET on this Mac),
+     shortly after the US close, so the logged day P&L is the full day. READ-ONLY: it never trades.
+     Requires the Mac to be awake at 16:10 ET (it usually is mid-afternoon). Install: mirror the
+     steps for com.blaquebaux.spine (bootstrap into the user GUI domain). -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blaquebaux.pnl</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_pnl_close.sh</string>
+    </array>
+
+    <!-- Mon(1) .. Fri(5) at 16:10 local (just after the 16:00 ET close). -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_pnl.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_pnl.err</string>
+</dict>
+</plist>

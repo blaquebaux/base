@@ -49,5 +49,10 @@ fi
 cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
 "$JULIA" --project=. scripts/spine_live.jl
 RC=$?
+
+# 4) read-only P&L attribution snapshot of the opening book (keys already sourced above).
+#    Runs regardless of the trade RC and can never change it — pure reporting into logs/.
+/usr/bin/python3 "$REPO/scripts/pnl_attribution.py" open || true
+
 echo "================ done rc=$RC $(TZ=America/New_York date '+%T %Z') ================"
 exit $RC
