@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Autonomous daily job for the SPLIT-UNIVERSE spine on a SECOND, isolated Alpaca paper account
+     (live A/B vs the single-universe spine). Runs Mon-Fri 09:21 local (1 min after the single job,
+     purely to stagger). The wrapper skips cleanly until ~/.config/blaquebaux/alpaca_split.env exists,
+     so this can be installed before the 2nd account is created. PAPER only. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blaquebaux.spine_split</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_spine_split_daily.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>21</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>21</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>21</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>21</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>21</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_split.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_split.err</string>
+</dict>
+</plist>

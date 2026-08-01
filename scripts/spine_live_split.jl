@@ -39,8 +39,10 @@ _writef(p, x) = (mkpath(dirname(p)); write(p, string(x)))
 function main(; capital = 100_000.0, pool = "us", regime = :dd, base_weight = 0.5,
               limits::SafetyLimits = SafetyLimits(),
               state_path = joinpath(REPO, "spine_state_split.jls"),
-              db_path = joinpath(REPO, "alpaca_ledger.sqlite"),
-              audit_path = joinpath(REPO, "alpaca_audit.jsonl"))
+              db_path = joinpath(REPO, "alpaca_ledger_split.sqlite"),
+              audit_path = joinpath(REPO, "alpaca_audit_split.jsonl"),
+              hwm_path = joinpath(dirname(default_hwm_path()), "equity_hwm_split.txt"),
+              equity_path = joinpath(dirname(default_equity_path()), "equity_last_split.txt"))
 
     if get(ENV, "ALPACA_KEY_ID", "") == "" || get(ENV, "ALPACA_SECRET_KEY", "") == ""
         error("Set ALPACA_KEY_ID and ALPACA_SECRET_KEY.")
@@ -64,8 +66,8 @@ function main(; capital = 100_000.0, pool = "us", regime = :dd, base_weight = 0.
             alert("ABORT [$mode]: could not read account"; level = :critical); return :no_account
         end
 
-        hwm      = max(load_hwm(), acct.equity)
-        last_eq  = _readf(default_equity_path())
+        hwm      = max(load_hwm(hwm_path), acct.equity)
+        last_eq  = _readf(equity_path)
         panel    = panel_at(AlpacaPanelProvider(SPLIT_UNION; lookback = 252))
         fresh    = (Dates.today() - panel.asof) <= Day(5)
 
@@ -90,7 +92,7 @@ function main(; capital = 100_000.0, pool = "us", regime = :dd, base_weight = 0.
             last_equity = last_eq, buying_power = acct.buying_power, data_fresh = fresh,
             targets = targets, prices = prices, limits = limits)
 
-        save_hwm(hwm); _writef(default_equity_path(), acct.equity)
+        save_hwm(hwm, hwm_path); _writef(equity_path, acct.equity)
 
         if !ok
             msg = "SAFETY ABORT [$mode]: " * join(reasons, "; ")

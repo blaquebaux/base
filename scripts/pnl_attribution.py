@@ -24,6 +24,7 @@ except Exception:
     ET = None
 
 PHASE = (sys.argv[1] if len(sys.argv) > 1 else "manual").lower()
+STRAT = os.environ.get("BB_STRATEGY", "single")   # which strategy/account this snapshot is for
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGDIR = os.path.join(REPO, "logs"); os.makedirs(LOGDIR, exist_ok=True)
 BASE = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets").rstrip("/") + "/v2"
@@ -75,9 +76,9 @@ def main():
     cash = f(a["cash"]); status = a.get("status", "?")
 
     append_csv(os.path.join(LOGDIR, "pnl_portfolio.csv"),
-               ["date", "timestamp_et", "phase", "equity", "last_equity", "day_pl", "day_pct",
-                "gross_mv", "gross_x", "net_x", "cash", "status"],
-               [date, ts, PHASE, "%.2f" % eq, "%.2f" % le, "%.2f" % day_pl, "%.4f" % day_pct,
+               ["date", "strategy", "timestamp_et", "phase", "equity", "last_equity", "day_pl",
+                "day_pct", "gross_mv", "gross_x", "net_x", "cash", "status"],
+               [date, STRAT, ts, PHASE, "%.2f" % eq, "%.2f" % le, "%.2f" % day_pl, "%.4f" % day_pct,
                 "%.2f" % gross, "%.4f" % gross_x, "%.4f" % net_x, "%.2f" % cash, status])
 
     ps = get("/positions")
@@ -93,14 +94,14 @@ def main():
     rows.sort(key=lambda r: abs(r["pl"]), reverse=True)
     for r in rows:
         append_csv(os.path.join(LOGDIR, "pnl_positions.csv"),
-                   ["date", "timestamp_et", "phase", "symbol", "side", "qty",
+                   ["date", "strategy", "timestamp_et", "phase", "symbol", "side", "qty",
                     "market_value", "day_pl", "day_pct", "weight_pct"],
-                   [date, ts, PHASE, r["symbol"], r["side"], "%.0f" % r["qty"],
+                   [date, STRAT, ts, PHASE, r["symbol"], r["side"], "%.0f" % r["qty"],
                     "%.2f" % r["mv"], "%.2f" % r["pl"], "%.4f" % r["pct"], "%.2f" % r["wt"]])
 
     # human-readable block
     L = []
-    L.append("================ P&L attribution [{}] {} ================".format(PHASE, ts))
+    L.append("========= P&L attribution [{}/{}] {} =========".format(STRAT, PHASE, ts))
     L.append("equity  ${:,.2f}    day P&L  ${:,.2f}  ({:+.2f}%)    gross {:.2f}x  net {:.2f}x    {}"
              .format(eq, day_pl, day_pct, gross_x, net_x, status))
     if rows:
@@ -114,7 +115,7 @@ def main():
     block = "\n".join(L)
 
     print(block)
-    with open(os.path.join(LOGDIR, "pnl_%s.log" % now.strftime("%Y-%m")), "a") as fh:
+    with open(os.path.join(LOGDIR, "pnl_%s_%s.log" % (STRAT, now.strftime("%Y-%m"))), "a") as fh:
         fh.write(block + "\n\n")
 
 
