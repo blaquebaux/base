@@ -199,21 +199,24 @@ sleeve wants **breadth** — many *independent* markets so something is always t
 split-universe spine gives each its own universe and blends the vol-targeted sleeves onto the union.
 
 - **Base (6):** SPY, IEF, TLT, GLD, DBC, DBA (long-only inverse-vol).
-- **Trend (11):** SPY, IEF, TLT, GLD, DBA + DBB, DBE, SLV, UUP, FXE, FXY (long/short 12-mo TSMOM) —
-  adds base-metals, energy, silver, and three currencies (all 0.38–0.51 corr to the classics), giving
-  trend genuinely independent markets. FX/single-commodities are *deliberately not* in the base sleeve
-  (no long-run premium to harvest long-only).
+- **Trend (9):** SPY, IEF, TLT, GLD, DBA + DBB, SLV, UUP, FXY (long/short 12-mo TSMOM) — adds
+  base-metals, silver, USD and JPY (0.43–0.51 corr to the classics), giving trend genuinely
+  independent markets. FX/single-commodities are *deliberately not* in the base sleeve (no long-run
+  premium to harvest long-only). **Shortable-only:** DBE (energy) and FXE (euro) are excluded because
+  they are not shortable on Alpaca and the trend sleeve must be able to go short (DBE was also 0.93-corr
+  redundant with DBC); removing them fixed deployability *and* improved the result.
 
 Validated on 2016–2026 (faithful backtest, net of 2 bps turnover):
 
 | Configuration | CAGR | Vol | Sharpe | Sortino | maxDD | Calmar |
 |---|---|---|---|---|---|---|
 | Single +DBA (6, current prod) | 5.9% | 5.7% | 1.04 | 1.45 | −8.9% | 0.66 |
-| **Split base6 / trend11 (50/50)** | 5.5% | **5.1%** | **1.07** | **1.49** | **−8.4%** | 0.65 |
-| Split base6 / trend11 (60/40) | 5.8% | 5.3% | 1.09 | 1.53 | −8.3% | 0.71 |
+| Split base6 / trend11 (incl. non-shortable) | 5.5% | 5.1% | 1.07 | 1.49 | −8.4% | 0.65 |
+| **Split base6 / trend9 (shortable, deployed)** | 5.9% | **5.2%** | **1.12** | **1.57** | −8.5% | 0.69 |
 
-The broad trend sleeve is a smoother, more reliable hedge → lower vol (5.7→5.1%) and shallower
-drawdown at equal/better return. **Status: built, not yet on the live path.** Implemented as
+The broad trend sleeve is a smoother, more reliable hedge → lower vol (5.7→5.2%) at higher return.
+**Status: built, ready, running on a 2nd paper account for a live A/B (not on the funded path).**
+Implemented as
 `SplitSpineState` / `split_spine_step!` / `split_indices` in `spine.jl` (9 unit tests in
 `test/test_spine.jl`), with a ready driver `scripts/spine_live_split.jl` that uses its **own** state
 file (`spine_state_split.jls`) and identical governance — so it can be paper-run alongside the single

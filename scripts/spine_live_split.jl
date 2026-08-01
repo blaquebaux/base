@@ -5,8 +5,8 @@
 # Identical governance to spine_live.jl (Layer-3 safety gate → governed orders →
 # reconcile), but the strategy is the split-universe spine: the long-only base
 # sleeve runs on 6 risk-premium asset-class ETFs; the long/short trend sleeve runs
-# on a broader 11-market CTA set (FX + single-commodity complexes). Validated
-# 2016-2026: Sharpe 1.04→1.07, lower vol/drawdown vs the single-universe +DBA spine
+# on a broader 9-market CTA set (all shortable — FX + commodity complexes). Validated
+# 2016-2026: Sharpe 1.04→1.12, lower vol/drawdown vs the single-universe +DBA spine
 # (docs/CANONICAL_ARCHITECTURE.md, "Split-universe spine").
 #
 # Runs against its OWN state file (spine_state_split.jls) and does NOT touch the
@@ -27,10 +27,13 @@ include(joinpath(REPO, "src/module_8_governance/safety_gate.jl"))
 using .ExecutionLayer, .FeedbackLayer, .PortfolioOptModule, .EquityPanel, .AlpacaPanel, .SafetyGate
 include(joinpath(REPO, "scripts/live_execution.jl"))
 
-# Base = risk-premium assets (long-only harvest). Trend = broad CTA markets (long/short).
+# Base = risk-premium assets (long-only harvest). Trend = broad CTA markets (long/SHORT).
+# Trend universe is SHORTABLE-ONLY: DBE (energy) and FXE (euro) are not shortable on Alpaca, and
+# the trend sleeve must be able to go short — so they are excluded (DBE was also 0.93-corr redundant
+# with DBC). Dropping them both fixed deployability AND improved the backtest (Sharpe 1.07 -> 1.12).
 const SPLIT_BASE   = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA"]
-const SPLIT_TREND  = ["SPY", "IEF", "TLT", "GLD", "DBA", "DBB", "DBE", "SLV", "UUP", "FXE", "FXY"]
-const SPLIT_UNION  = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA", "DBB", "DBE", "SLV", "UUP", "FXE", "FXY"]
+const SPLIT_TREND  = ["SPY", "IEF", "TLT", "GLD", "DBA", "DBB", "SLV", "UUP", "FXY"]
+const SPLIT_UNION  = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA", "DBB", "SLV", "UUP", "FXY"]
 const LIVE_SENTINEL = "I_UNDERSTAND_THIS_IS_REAL_MONEY"
 
 _readf(p) = isfile(p) ? (v = tryparse(Float64, strip(read(p, String))); v === nothing ? NaN : v) : NaN
