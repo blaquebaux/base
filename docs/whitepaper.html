@@ -165,6 +165,23 @@
   return), and the third is the Markowitz error-maximization trap. Sophisticated machinery packages
   and sizes a signal; it does not create one. That distinction is the whole paper.</p>
 
+  <h2><span class="n">6</span>Recent extensions <span style="font-weight:400;font-size:.62em;color:var(--muted);letter-spacing:.04em">— IN LIVE TESTING, NOT YET PART OF THE VALIDATED CORE ABOVE</span></h2>
+  <p>Two changes are being trialled since the results above were established. Both are honest works in
+  progress: validated only on a shorter <b>2016–2026</b> window (no 2008 crisis in it), so they lean as
+  much on economic reasoning as on the backtest, and they graduate into the results above only if they
+  hold up out-of-sample on live paper.</p>
+  <p><b>A sixth sleeve — DBA (agriculture).</b> Of the diversifiers tested (international/EM equity,
+  credit, REITs, silver), only agriculture proved genuinely uncorrelated to the existing five
+  (0.44 vs 0.66–0.84 for the rest, which are equity/rate beta in disguise). Added to production, it
+  lifted the backtested Sharpe from ≈0.94 to ≈1.04 at roughly flat drawdown. The economic case —
+  weather- and supply-driven risk, orthogonal to financial markets — is the stronger justification.</p>
+  <p><b>A split-universe spine.</b> The two sleeves want different universes: the long-only base wants
+  risk-premium assets, while the long/short trend sleeve wants <em>breadth</em> — many independent
+  markets so something is always trending. Giving trend its own broader (shortable) set — adding
+  base-metals, silver, and USD/JPY — backtests at Sharpe ≈1.12 with lower volatility. It is running in
+  a <b>live paper A/B</b> against the single-universe spine on a separate account; no funded capital is
+  on it. If it wins on real out-of-sample data, it becomes the spine and this section moves up.</p>
+
   <div class="foot">
     Full mathematics, code references, and citations: <b>docs/FINANCIAL_METHODS.md</b>. Interactive
     leverage explorer: <b>docs/leverage_decision.html</b>. Architecture: <b>docs/CANONICAL_ARCHITECTURE.md</b>.
