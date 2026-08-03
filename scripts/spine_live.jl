@@ -37,9 +37,13 @@ _writef(p, x) = (mkpath(dirname(p)); write(p, string(x)))
 
 function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = :dd,
               limits::SafetyLimits = SafetyLimits(),
-              state_path = joinpath(REPO, "spine_state_alpaca.jls"),
-              db_path = joinpath(REPO, "alpaca_ledger.sqlite"),
-              audit_path = joinpath(REPO, "alpaca_audit.jsonl"))
+              # All persistence paths are env-overridable so a SECOND account can run this same driver
+              # in full isolation (e.g. the single-multi A/B leg). Defaults = account #1's files.
+              state_path  = get(ENV, "BB_STATE_PATH",  joinpath(REPO, "spine_state_alpaca.jls")),
+              db_path     = get(ENV, "BB_LEDGER_PATH", joinpath(REPO, "alpaca_ledger.sqlite")),
+              audit_path  = get(ENV, "BB_AUDIT_PATH",  joinpath(REPO, "alpaca_audit.jsonl")),
+              hwm_path    = get(ENV, "BB_HWM_PATH",    default_hwm_path()),
+              equity_path = get(ENV, "BB_EQUITY_PATH", default_equity_path()))
 
     if get(ENV, "ALPACA_KEY_ID", "") == "" || get(ENV, "ALPACA_SECRET_KEY", "") == ""
         error("Set ALPACA_KEY_ID and ALPACA_SECRET_KEY.")
@@ -63,8 +67,8 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
             alert("ABORT [$mode]: could not read account"; level = :critical); return :no_account
         end
 
-        hwm      = max(load_hwm(), acct.equity)
-        last_eq  = _readf(default_equity_path())
+        hwm      = max(load_hwm(hwm_path), acct.equity)
+        last_eq  = _readf(equity_path)
         panel    = panel_at(AlpacaPanelProvider(universe; lookback = 252))
         fresh    = (Dates.today() - panel.asof) <= Day(5)
 
@@ -96,7 +100,7 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
             last_equity = last_eq, buying_power = acct.buying_power, data_fresh = fresh,
             targets = targets, prices = prices, limits = limits)
 
-        save_hwm(hwm); _writef(default_equity_path(), acct.equity)   # persist regardless
+        save_hwm(hwm, hwm_path); _writef(equity_path, acct.equity)   # persist regardless (per-account)
 
         if !ok
             msg = "SAFETY ABORT [$mode]: " * join(reasons, "; ")

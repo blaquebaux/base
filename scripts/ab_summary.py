@@ -24,8 +24,9 @@ CFG = os.path.expanduser("~/.config/blaquebaux")
 BASE = "https://paper-api.alpaca.markets/v2"
 
 STRATS = [  # label, env file, expected job logfile prefix
-    ("SINGLE (+DBA)",   os.path.join(CFG, "alpaca.env"),       "spine"),
+    ("SINGLE (sign)",    os.path.join(CFG, "alpaca.env"),       "spine"),
     ("SPLIT (universe)", os.path.join(CFG, "alpaca_split.env"), "spine_split"),
+    ("MULTI (single+multi)", os.path.join(CFG, "alpaca_multi.env"), "spine_multi"),
 ]
 
 
@@ -121,13 +122,14 @@ def main():
             tops = "  ".join("{}:{:+,.0f}".format(r["s"], r["pl"]) for r in s["top"])
             L.append("    top P&L        %s" % tops)
 
-    # head-to-head (only if both have numbers)
+    # head-to-head: each active leg vs SINGLE (the control)
     nums = [s for s in snaps if "pct" in s]
-    if len(nums) == 2:
-        d = nums[1]["pct"] - nums[0]["pct"]
+    if len(nums) >= 2:
+        base = nums[0]
         L.append("")
         L.append("  " + "-" * 62)
-        L.append("  head-to-head today:  SPLIT − SINGLE = {:+.2f}%".format(d))
+        for s in nums[1:]:
+            L.append("  today:  {} − {} = {:+.2f}%".format(s["label"], base["label"], s["pct"] - base["pct"]))
     L.append("")
 
     block = "\n".join(L)

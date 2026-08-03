@@ -49,6 +49,7 @@ snapshot() {
 if is_trading_day; then
     snapshot "$CFG/alpaca.env"        single
     snapshot "$CFG/alpaca_split.env"  split
+    snapshot "$CFG/alpaca_multi.env"  multi
 else
     echo "not a trading day — skipping both accounts"
 fi
