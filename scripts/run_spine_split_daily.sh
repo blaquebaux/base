@@ -44,6 +44,16 @@ elif [ "$IS_OPEN" != "true" ] && [ "$NEXT_OPEN" != "$ET_TODAY" ]; then
     echo "not a trading day (is_open=$IS_OPEN, next_open=$NEXT_OPEN, et_today=$ET_TODAY) — skipping"; exit 0
 fi
 
+# 2b) catch-up guard (see run_spine_daily.sh): skip if this account already placed a book today, so
+#     multiple morning fire times give at-most-once trading whenever the Mac is next awake.
+ORDERS_TODAY=$(curl -s --max-time 15 \
+    -H "APCA-API-KEY-ID: $ALPACA_KEY_ID" -H "APCA-API-SECRET-KEY: $ALPACA_SECRET_KEY" \
+    "https://paper-api.alpaca.markets/v2/orders?status=all&limit=10&after=${ET_TODAY}T00:00:00Z" \
+    | grep -o '"id"' | wc -l | tr -d ' ')
+if [ "${ORDERS_TODAY:-0}" -gt 0 ]; then
+    echo "already placed $ORDERS_TODAY order(s) today — skipping (catch-up no-op)"; exit 0
+fi
+
 # 3) the split-universe spine through the same Layer-3 safety gate (own state/ledger/hwm files).
 cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
 "$JULIA" --project=. scripts/spine_live_split.jl
