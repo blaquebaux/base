@@ -68,12 +68,12 @@ def job_status(prefix, datestr):
         return "!! SAFETY HALT"
     if "RECONCILE FAILED" in txt or "reconcile mismatch" in txt:
         return "!! RECONCILE FAILED"
+    if "reconciled=true" in txt:          # a successful placement today wins over any earlier skip line
+        return "OK"
+    if "not activated" in txt:
+        return "not activated (no keys)"
     if "not a trading day" in txt:
         return "skipped (non-trading day)"
-    if "no " in txt and "not activated" in txt:
-        return "not activated (no 2nd account)"
-    if "reconciled=true" in txt:
-        return "OK"
     return "ran (see log)"
 
 
