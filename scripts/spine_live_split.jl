@@ -84,7 +84,9 @@ function main(; capital = 100_000.0, pool = "us", regime = :dd, base_weight = 0.
             m.base_s2, m.trend_s2, m.n = state.base_s2, state.trend_s2, state.n
             state = m
         end
-        w        = split_spine_step!(state, panel.returns)
+        trend_mode = Symbol(lowercase(get(ENV, "BB_TREND_MODE", "sign")))
+        @info "split spine trend mode" trend_mode
+        w        = split_spine_step!(state, panel.returns; trend_mode = trend_mode)
         reg      = regime_multiplier(panel.returns[:, bi], :dd) < 1.0 ? "risk-off" : "normal"
         targets  = spine_targets(w, panel.symbols, panel.prices, capital)
         prices   = Dict(panel.symbols[i] => panel.prices[i] for i in eachindex(panel.symbols))

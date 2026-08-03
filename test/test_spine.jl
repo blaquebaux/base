@@ -170,4 +170,20 @@ end
     @test all(isfinite, w2) && st2.n == 2 && st2.base_s2 > 0
 end
 
+@testset "multi-horizon trend signal + trend_mode flag" begin
+    # unanimous up / down across horizons → ±1
+    @test tsmom_signal_multi(hcat(fill(0.01, 300), fill(-0.01, 300))) == [1.0, -1.0]
+    # older down-move then a recent up-move → horizons disagree → strictly inside (−1, 1)
+    s = tsmom_signal_multi(vcat(fill(-0.01, 220, 1), fill(0.02, 80, 1)))
+    @test -1.0 < s[1] < 1.0
+
+    # spine_step! honors the flag: :multi differs from :sign, both well-formed, default is :sign
+    Random.seed!(11); R = 0.01 .* randn(400, 4)
+    w_sign  = spine_step!(SpineState(4; regime = :none), R; trend_mode = :sign)
+    w_multi = spine_step!(SpineState(4; regime = :none), R; trend_mode = :multi)
+    @test length(w_multi) == 4 && all(isfinite, w_multi)
+    @test w_sign != w_multi                                             # the flag changes the book
+    @test spine_step!(SpineState(4; regime = :none), R) == w_sign       # default :sign (back-compat)
+end
+
 end # module

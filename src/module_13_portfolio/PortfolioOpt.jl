@@ -73,7 +73,7 @@ export backtest, equal_weight
 
 # ---- spine (validated Path-B strategy) --------------------------------------
 include("spine.jl")
-export tsmom_signal, tsmom_weights, voltarget_exposure, spine_weights, spine_strategy,
+export tsmom_signal, tsmom_signal_multi, tsmom_weights, voltarget_exposure, spine_weights, spine_strategy,
        SpineState, spine_step!, spine_targets, regime_multiplier,
        SplitSpineState, split_spine_step!, split_indices
 

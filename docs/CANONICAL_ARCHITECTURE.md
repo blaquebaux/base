@@ -223,6 +223,33 @@ file (`spine_state_split.jls`) and identical governance — so it can be paper-r
 spine, then adopted by repointing the launchd wrapper. Default blend 50/50 (untuned; 60/40 was
 marginally better but avoid overfitting the blend). Caveat: 2016–2026 only (no GFC).
 
+## Multi-horizon trend + the convexity research arc (2026-08-03)
+
+**Multi-horizon trend flag — wired, behind `BB_TREND_MODE`.** `spine.jl` now offers `tsmom_signal_multi`
+(the average of 3/6/12-month trend signs, a continuous strength in [−1,1]) selectable via a `trend_mode`
+keyword on `spine_step!` / `split_spine_step!`. Both live drivers read `BB_TREND_MODE` (default `sign` =
+the exactly-validated 12-month sign; `multi` = the new construction). **Production is unchanged unless the
+env var is set.** Sketch result (2017–2026, `scripts/research/convex_trend_sketch.py`): multi-horizon
+lifts the spine Sharpe 1.04→1.16, CAGR 5.9→6.9%, maxDD −8.9→−7.0%, and makes the trend sleeve more convex
+(skew ↑, 2022 capture ↑) — *funded by the momentum premium, no theta cost*. To A/B it: set
+`BB_TREND_MODE=multi` on one paper account. Pending OOS/purged-CV before the funded path.
+
+**The convexity investigation (barbell → overlay → trend), documented in `scripts/research/`.** A thorough
+thought-exercise line established a clean map:
+- A paid long-vol tail overlay (VIXY) *worsens* the Spine — the Spine's trend sleeve is already a crisis
+  hedge funded by momentum, and VIXY carry is a drawdown machine in calm regimes (`spine_tail_overlay_sketch.py`).
+- Making the trend sleeve *more convex* is the right move, but only via **breadth (multi-horizon / split
+  universe)** — a "convex response function" (size by strength²) backfires (levers calm uptrends, flattens
+  skew). Multi-horizon × split-universe are **substitutes on Sharpe**, complements only on tail-shape
+  (`convex_trend_sketch.py`, `multi_horizon_split_sketch.py`).
+- **Trend, at any speed, cannot catch a *sharp* crash** (COVID): faster horizons fight short-horizon
+  reversal and whipsaw the V-recovery (`crash_and_curveball_sketch.py`).
+- The **barbell / curveball** (Taleb 90/10, and the reversed 10/90) confirmed the philosophy: the curveball is
+  a dark-horse convex sliver you *let bleed* and hold for the disaster (+234% in COVID on its 10%); every rule
+  that trims the bleed also kills the payoff — you can't and shouldn't time it (`barbell_sketch.py`).
+- **Capstone law:** convexity is either *free* (momentum/trend → sustained crises, ~no cost) or *paid*
+  (long-vol/theta → sharp crashes, ruinous & un-timeable). No cheap, timed, crash-day hedge exists among these.
+
 ## Verification (deep-read, 2026-07-26)
 `risk_engine.py`, `pool_manager.py`, `signal_engine.py`, and `risk_intelligence.py` were read
 **in full**; the rest structure-scanned. Verdict: the Bayesian alpha engine and the risk stack

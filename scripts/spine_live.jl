@@ -81,7 +81,11 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
             migrated.base_s2, migrated.trend_s2, migrated.n = state.base_s2, state.trend_s2, state.n
             state = migrated
         end
-        w        = spine_step!(state, panel.returns)
+        # trend construction flag: BB_TREND_MODE=multi enables the 3/6/12-month multi-horizon trend
+        # (more convex; sketch-validated, pending OOS). Default :sign = the exactly-validated 12-mo sign.
+        trend_mode = Symbol(lowercase(get(ENV, "BB_TREND_MODE", "sign")))
+        @info "spine trend mode" trend_mode
+        w        = spine_step!(state, panel.returns; trend_mode = trend_mode)
         reg      = regime_multiplier(panel.returns, :dd) < 1.0 ? "risk-off" : "normal"
         targets  = spine_targets(w, panel.symbols, panel.prices, capital)
         prices   = Dict(panel.symbols[i] => panel.prices[i] for i in eachindex(panel.symbols))

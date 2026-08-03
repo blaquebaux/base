@@ -31,6 +31,32 @@ function tsmom_signal(R::AbstractMatrix; lookback::Int = 252)
 end
 
 """
+    tsmom_signal_multi(R; lookbacks=(63,126,252)) -> Vector
+
+Multi-horizon trend signal: the **average of the trend signs** across several lookbacks, giving a
+continuous strength in `[-1, 1]` (all horizons agree up → +1; disagree → near 0; all down → −1).
+Blending 3/6/12-month agreement makes the trend sleeve more crash-responsive and more convex
+(higher skew, shallower drawdown) than the single 12-month sign, funded by the momentum premium
+rather than paid vol — a research-sketch result (see `scripts/research/convex_trend_sketch.py`).
+Causal — reads only the window it is given.
+"""
+function tsmom_signal_multi(R::AbstractMatrix; lookbacks = (63, 126, 252))
+    T = size(R, 1); acc = zeros(size(R, 2))
+    for k in lookbacks
+        lo = max(1, T - k + 1)
+        acc .+= sign.(vec(prod(1 .+ view(R, lo:T, :); dims = 1)) .- 1)
+    end
+    return acc ./ length(lookbacks)
+end
+
+# Trend signal selector for the stateful spines. `:sign` = single-lookback sign (validated default);
+# `:multi` = 3/6/12-month agreement (more convex, behind a flag pending its own OOS validation).
+_trend_signal(W, mode::Symbol, lookback::Int) =
+    mode === :multi ? tsmom_signal_multi(W) :
+    mode === :sign  ? tsmom_signal(W; lookback = lookback) :
+    error("unknown trend_mode $mode (use :sign or :multi)")
+
+"""
     tsmom_weights(σ, signal) -> Vector
 
 Long/short trend weights: each asset's `signal` scaled by inverse volatility
@@ -252,7 +278,7 @@ the verified harness):
    sized on *its own P&L* vol, so a crisis where trend profits smoothly keeps it engaged.
 4. Blend `base_weight·base ⊕ (1−base_weight)·trend`; remember the new weights for next bar.
 """
-function spine_step!(s::SpineState, window::AbstractMatrix)
+function spine_step!(s::SpineState, window::AbstractMatrix; trend_mode::Symbol = :sign)
     λ = 1 - 2 / (s.vol_span + 1)
     last_bar = @view window[end, :]
 
@@ -264,7 +290,7 @@ function spine_step!(s::SpineState, window::AbstractMatrix)
 
     Σ = ewma_cov(window; halflife = s.halflife); σ = sqrt.(diag(Σ))    # 2. fresh weights
     base_w  = _base_weights(s.base, Σ, σ)
-    trend_w = tsmom_weights(σ, tsmom_signal(window; lookback = s.mom_lookback))
+    trend_w = tsmom_weights(σ, _trend_signal(window, trend_mode, s.mom_lookback))
 
     expo(s2) = (s.n == 0 || s2 <= eps()) ? s.cap :      # 3. per-sleeve vol-target
                min(s.cap, s.sleeve_vol / sqrt(s2 * 252))
@@ -365,7 +391,7 @@ whose last row is the just-realized bar. Same order of operations as `spine_step
 sleeve is computed on its own columns and both are accumulated into the union book; the regime
 brake reads the base sleeve's market proxy.
 """
-function split_spine_step!(s::SplitSpineState, window::AbstractMatrix)
+function split_spine_step!(s::SplitSpineState, window::AbstractMatrix; trend_mode::Symbol = :sign)
     λ = 1 - 2 / (s.vol_span + 1)
     N = size(window, 2)
     last_bar = @view window[end, :]
@@ -382,7 +408,7 @@ function split_spine_step!(s::SplitSpineState, window::AbstractMatrix)
     base_w  = _base_weights(s.base, Σb, σb)
     Wt = window[:, s.trend_idx]
     σt = sqrt.(diag(ewma_cov(Wt; halflife = s.halflife)))
-    trend_w = tsmom_weights(σt, tsmom_signal(Wt; lookback = s.mom_lookback))
+    trend_w = tsmom_weights(σt, _trend_signal(Wt, trend_mode, s.mom_lookback))
 
     expo(s2) = (s.n == 0 || s2 <= eps()) ? s.cap :      # 3. per-sleeve vol-target
                min(s.cap, s.sleeve_vol / sqrt(s2 * 252))
