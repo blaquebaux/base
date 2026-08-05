@@ -1,0 +1,200 @@
+<title>Blaque Baux — The Complete Method</title>
+<style>
+  @page{ margin:16mm 14mm 18mm; }
+  @media print{
+    :root{ color-scheme:light; }
+    body{ background:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .wrap{ max-width:100% !important; padding:0 !important; }
+    table,.abstract,.foot,.law,figure,tr{ break-inside:avoid; page-break-inside:avoid; }
+    h2{ break-after:avoid; page-break-after:avoid; }
+  }
+  :root{
+    --bg:#eef1f5; --surface:#fff; --surface2:#f7f9fb; --ink:#0e1726; --muted:#54637a; --faint:#8a99ad;
+    --line:#dde3ec; --accent:#0f8f6f; --pos:#0f8f6f; --neg:#d9534a; --warn:#9a6410;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 10px 30px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#090f1c;--surface:#101a2c;--surface2:#0d1524;--ink:#e7edf6;--muted:#97a8c0;--faint:#5f708a;--line:#1e2b41;--accent:#2bc79a;--pos:#2bc79a;--neg:#ff6a60;--warn:#e0a53a;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4)}}
+  :root[data-theme="dark"]{--bg:#090f1c;--surface:#101a2c;--surface2:#0d1524;--ink:#e7edf6;--muted:#97a8c0;--faint:#5f708a;--line:#1e2b41;--accent:#2bc79a;--pos:#2bc79a;--neg:#ff6a60;--warn:#e0a53a}
+  :root[data-theme="light"]{--bg:#eef1f5;--surface:#fff;--surface2:#f7f9fb;--ink:#0e1726;--muted:#54637a;--faint:#8a99ad;--line:#dde3ec;--accent:#0f8f6f;--pos:#0f8f6f;--neg:#d9534a;--warn:#9a6410}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:56px 26px 96px}
+  .eyebrow{font:600 12px/1.4 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:"New York",ui-serif,Georgia,serif;font-weight:600;font-size:clamp(34px,6vw,52px);line-height:1.03;letter-spacing:-.015em;margin:.3em 0 .1em;text-wrap:balance}
+  .dek{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:64ch;margin:.4em 0 0;text-wrap:pretty}
+  .byline{margin-top:22px;font:500 13px/1.6 ui-monospace,"SF Mono",Menlo,monospace;color:var(--faint)}
+  .byline b{color:var(--ink)}
+  .rule{height:1px;background:var(--line);margin:32px 0}
+  .abstract{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:22px 24px;font-size:15.5px}
+  .abstract .lab{font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:8px}
+  h2{font-family:"New York",ui-serif,Georgia,serif;font-weight:600;font-size:26px;letter-spacing:-.01em;margin:50px 0 6px;text-wrap:balance}
+  h2 .n{color:var(--accent);font-family:ui-monospace,Menlo,monospace;font-size:15px;margin-right:12px;vertical-align:2px}
+  h3{font-size:16.5px;margin:22px 0 2px}
+  p{margin:12px 0;font-size:15.5px}
+  b,strong{font-weight:650}
+  em{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  thead th{font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  .grp td{background:var(--surface2);font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px}
+  .v-live{color:var(--pos);font-weight:650}
+  .v-ab{color:var(--accent);font-weight:650}
+  .v-res{color:var(--warn);font-weight:650}
+  .v-no{color:var(--neg);font-weight:650}
+  .law{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:12px 16px;margin:12px 0}
+  .law b{color:var(--accent)}
+  .foot{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+  .foot a,.foot b{color:var(--accent)}
+  .disc{margin-top:16px;font-size:12.5px;color:var(--faint);font-style:italic}
+  .lede{font-size:16px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Blaque Baux · Research Compendium</div>
+  <h1>The complete method</h1>
+  <p class="dek">The full body of work behind a single-strategy platform: every approach explored,
+  validated, or rejected — and the discipline that decided. Twenty-plus strategies, one honest
+  scorecard, and the reason only a few of them ship.</p>
+  <div class="byline">by <b>Carter Warrens</b> · 2026 · reference implementation in Julia · figures are historical backtests / paper results on ETF and equity data</div>
+
+  <div class="rule"></div>
+  <div class="abstract">
+    <span class="lab">The program in one paragraph</span>
+    Blaque Baux began as an alpha-prediction system and became a risk-premium harvester, because
+    <b>rigorous out-of-sample testing found no exploitable predictive edge</b> at the horizons and
+    instruments we can access — a result we reproduced a dozen ways (cross-sectional factors, Bayesian
+    filtering, 15-minute signals, cross-industry lead-lag, pairs arbitrage: all coin flips). What
+    <em>survives</em> is <b>risk structure</b> — diversification and trend premia, harvested by a
+    governed daily process. Around that core we ran a deep second program on <b>convexity and tail
+    protection</b>, on <b>correlation structure</b>, and on <b>aggression and leverage</b>, each ending
+    in a durable, often counter-intuitive law. This paper is the map of all of it: what shipped, what is
+    in live testing, what was kept as research, and — just as prominently — what was tested and rejected,
+    with the reason. The honesty is the point: a strategy is only as trustworthy as the ideas it was
+    willing to kill.</p>
+  </div>
+
+  <h2><span class="n">1</span>The founding finding</h2>
+  <p>On 60-day 15-minute data (~1,547 bars × 60 S&amp;P names), two independent alpha models scored
+  <b>50.9%</b> and <b>50.7%</b> directional accuracy — coin flips, information coefficient ≈ 0. We then
+  reproduced the null across blue-chip and mid-cap universes, cross-industry lead-lag, and pairs
+  mean-reversion. The conclusion was not "try harder"; it was <b>structural</b>: at retail-accessible
+  horizons and costs, the market has already priced what's knowable. So the platform stopped forecasting
+  returns and started harvesting the premia paid for <em>bearing risk</em> — diversification, trend,
+  term/asset premia — where an out-of-sample edge genuinely survives.</p>
+
+  <h2><span class="n">2</span>The scorecard</h2>
+  <p class="lede">Every strategy and idea explored, with its verdict and status. Green = live or graduating;
+  amber = kept as research; red = tested and rejected. This is the whole program at a glance.</p>
+  <table>
+    <thead><tr><th style="width:22%">Strategy / idea</th><th style="width:15%">Category</th><th>Finding</th><th style="width:14%">Status</th></tr></thead>
+    <tbody>
+      <tr class="grp"><td colspan="4">Live &amp; production</td></tr>
+      <tr><td><b>The Spine</b> (inverse-vol/ERC base + 12-mo TSMOM trend + vol-target + regime brake)</td><td>Risk-premium harvest</td><td>Sharpe ≈ 0.97, maxDD ≈ −11%, 2022 −1.4%; trend sleeve carries crises. Forecasts nothing.</td><td class="v-live">LIVE</td></tr>
+      <tr><td><b>DBA</b> (agriculture) 6th sleeve</td><td>Diversification</td><td>Only genuinely-uncorrelated add tested (0.44 vs DBC); Sharpe 0.94→1.04.</td><td class="v-live">LIVE</td></tr>
+      <tr class="grp"><td colspan="4">Graduated — in live paper A/B (3 isolated accounts)</td></tr>
+      <tr><td><b>Multi-horizon trend</b> (3/6/12-mo agreement)</td><td>Funded convexity</td><td>Strict improvement: Sharpe 1.04→1.16, drawdown −8.9→−7.0%, more convex, no cost.</td><td class="v-ab">A/B</td></tr>
+      <tr><td><b>Split-universe spine</b> (base vs trend on different universes)</td><td>Breadth</td><td>Trend on a broad shortable CTA set → Sharpe ≈ 1.12, lower vol; substitutes with multi-horizon.</td><td class="v-ab">A/B</td></tr>
+      <tr class="grp"><td colspan="4">Reviewed, kept as research (not deployed)</td></tr>
+      <tr><td><b>Taleb barbell / the "curveball"</b> (90/10 and reversed 10/90 convex sliver)</td><td>Convexity</td><td>A dark horse: bleeds, ruin if compounded, but +237% in COVID on its 10%. Hold, don't time.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Inverse carry</b> (short high-carry = short the premium)</td><td>Tail hedge</td><td>Positive-skew hedge that catches the rate/credit crisis (2022) VIXY misses.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Diversified tail hedge</b> (across crisis regimes)</td><td>Convexity</td><td>Deflation + inflation hedges are anti-correlated → a sliver positive in <em>every</em> crisis.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Gamma-ARMA regime framework</b> (Bayesian regime over ARMA/GARCH space)</td><td>Regime / risk</td><td>Sophisticated, specified, <em>unvalidated</em> (backtest never run). Path-A funded research.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Optimizer library</b> (Markowitz, Black-Litterman, CVaR/CDaR, HRP, Michaud, cost-aware)</td><td>Infrastructure</td><td>General-purpose portfolio-optimization stack + REST service; the spine is one strategy on it.</td><td class="v-res">TOOL</td></tr>
+      <tr class="grp"><td colspan="4">Tested &amp; rejected — return prediction (alpha)</td></tr>
+      <tr><td>3-factor cross-sectional &amp; Bayesian (Kalman/NIG/James-Stein/ADVI) alpha</td><td>Alpha</td><td>50.9% / 50.7% accuracy, IC ≈ 0 — coin flips. Archived.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Blue-chip &amp; mid/small-cap directional prediction</td><td>Alpha</td><td>Blue-chip a coin flip; mid-cap only short-horizon reversal (not tradeable at cost).</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>15-minute intraday alpha</td><td>Alpha</td><td>Noise (50.9%); intraday cadence adds nothing — diversification is the shock absorber.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Lead-lag / earnings read-through (NVDA→semis, banks, tech)</td><td>Alpha</td><td>Priced same-day (corr 0.7–0.9), next-day ≈ 0; in tech it <em>reverses</em> (chasing loses).</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Pairs / relative-value mean-reversion (stat-arb)</td><td>Alpha</td><td>Diversified book ≈ 0.15 Sharpe (noise); many "pairs" drift apart permanently.</td><td class="v-no">REJECTED</td></tr>
+      <tr class="grp"><td colspan="4">Tested &amp; rejected — convexity, carry, leverage</td></tr>
+      <tr><td>Vol-aware VIXY tail overlay on the Spine</td><td>Paid convexity</td><td>Hurts — the Spine's trend is already a crisis hedge; VIXY carry is a drawdown machine.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Convex response function (size by trend strength²)</td><td>Convexity</td><td>Backfires — levers calm uptrends, flattens skew. Convexity must be in the payoff.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Carry sleeve as a third premium</td><td>Risk premium</td><td>Genuinely uncorrelated (−0.02) but negative-expectancy + negative skew → lowers Sharpe.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Carry as the barbell's earning sleeve</td><td>Convexity</td><td>Crashes when the convex sleeve pays — eats the payoff. Safe sleeve must be inert.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Leverage to double-digit returns</td><td>Aggression</td><td>Net-negative at retail financing; Kelly ≈ 1×; higher leverage = ruin, not riches.</td><td class="v-no">REJECTED</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">3</span>What's live, and what's graduating</h2>
+  <p><b>Production:</b> the Spine — a two-sleeve book (inverse-vol/ERC base + 12-month time-series-momentum
+  trend), each volatility-targeted on its own realized P&amp;L, blended 50/50 and scaled by a drawdown
+  regime brake, rebalanced once daily and routed through a governed execution layer. Net of costs it
+  delivers a Sharpe near 1.0 at ~11% maximum drawdown, with the trend sleeve making money in 2022 while a
+  long book bled. It now trades six assets (SPY / IEF / TLT / GLD / DBC / DBA).</p>
+  <p><b>In live A/B (three isolated paper accounts):</b> single-sign (the control), split-universe, and
+  single-multi-horizon — so the two candidate upgrades are measured head-to-head against production on
+  real fills, each with its own state, ledger, and safety files. Nothing graduates to funded capital
+  until it clears out-of-sample / purged cross-validation.</p>
+
+  <h2><span class="n">4</span>The research themes</h2>
+  <h3>Return prediction — the null result, five ways</h3>
+  <p>Every route to forecasting returns landed in the same place: cross-sectional factors, Bayesian
+  filtering, blue-chip and mid-cap direction, 15-minute signals, cross-industry lead-lag, and pairs
+  arbitrage. The consistency <em>is</em> the evidence — the market prices what's knowable, instantly.</p>
+  <h3>Convexity &amp; tail hedging — free vs paid</h3>
+  <p>The deepest thread. Convexity comes in two forms: <b>free</b> (trend/momentum, funded by the
+  momentum premium — protects sustained crises, improves return) and <b>paid</b> (long-vol/short-carry,
+  funded by decay — protects sharp crashes, but bleeds and can't be timed). A paid overlay <em>hurts</em>
+  the Spine (it already owns free convexity); making the trend sleeve multi-horizon is the win. The best
+  standalone hedge is <b>diversified across crisis regimes</b> — deflation (VIXY, short-credit) and
+  inflation (short-duration, long-commodities) are anti-correlated, so a small sliver has no blind spot.</p>
+  <h3>Correlation structure — real, but priced</h3>
+  <p>Industries, supply chains, and firms are strongly correlated (sectors ~0.62, banks ~0.87) — but the
+  read-through is <em>instantaneous</em>, so it's a risk tool, not an alpha source. And correlation ∝
+  <b>shared forced exposure</b>: prudential regulation (banks, utilities) or a common input (airlines:
+  fuel) homogenizes firms into one factor, while product regulation with idiosyncratic outcomes (pharma,
+  biotech under the FDA) leaves them uncorrelated despite heavy oversight.</p>
+  <h3>Aggression &amp; leverage — the growth-vs-ruin frontier</h3>
+  <p>"Most aggressive" has a principled ceiling (Kelly) and a brutal catch: aggression multiplies edge,
+  and ours is modest. At retail financing, leverage <em>lowers</em> growth; a max-aggressive convex bet
+  has a median terminal wealth below the stake. Rational aggression is fractional Kelly on real edge — or
+  a small barbell sleeve — never all-in.</p>
+  <h3>The archived alpha track</h3>
+  <p>The original Bayesian alpha engine, a Monte-Carlo risk simulator, a Sharpe-on-historical-means
+  "Oracle," and the Gamma-ARMA regime framework are preserved but archived — the mathematics is sound,
+  the measured edge was not there. Sophisticated machinery <em>packages and sizes</em> a signal; it does
+  not <em>create</em> one.</p>
+
+  <h2><span class="n">5</span>The durable laws</h2>
+  <p>The findings that survive the small-sample caveats — directional and structural, the real output of the program.</p>
+  <div class="law"><b>I.</b> At tradeable horizons there is no exploitable return-prediction edge — so harvest premia, don't forecast.</div>
+  <div class="law"><b>II.</b> Convexity is <em>free</em> (trend → sustained crises) or <em>paid</em> (long-vol → sharp crises); no instrument gives cheap, timed, crash-day protection.</div>
+  <div class="law"><b>III.</b> Timing the tail removes the tail — every rule that trims a hedge's bleed also removes its payoff.</div>
+  <div class="law"><b>IV.</b> Diversification is necessary but not sufficient — an uncorrelated stream only helps if it is positive-expectancy.</div>
+  <div class="law"><b>V.</b> A hedge's safe sleeve must be inert in a crisis; anything with hidden crisis-beta is not safe.</div>
+  <div class="law"><b>VI.</b> There are two crisis regimes (deflation, inflation); they are anti-correlated and need opposite hedges.</div>
+  <div class="law"><b>VII.</b> Aggression multiplies edge — with none, it multiplies only ruin (Kelly ≈ 1× here).</div>
+  <div class="law"><b>VIII.</b> Correlation is real and priced instantly — a risk tool, not an alpha source.</div>
+  <div class="law"><b>IX.</b> Correlation ∝ shared forced exposure (prudential regulation or a common input); idiosyncratic outcomes decorrelate.</div>
+  <div class="law"><b>X.</b> The discipline — validate out-of-sample, then deploy — is the actual product; a strategy is only as trustworthy as the ideas it killed.</div>
+
+  <h2><span class="n">6</span>Governance — the discipline is the product</h2>
+  <p>Every order passes one governed path enforcing hard, tested invariants: idempotency, per-pool budget
+  and daily-loss limits, data-staleness, position reconciliation, a kill switch, and full fill lineage —
+  beneath a pre-trade safety gate (drawdown/loss halts, gross-leverage and per-name caps, account and
+  data checks). No language model is anywhere near the order path; the strategy is reproducible code. The
+  autonomous daily job runs deterministically pre-open with morning catch-up fires, and reports its book
+  and P&amp;L to a comparison log. Nothing reaches capital without clearing the same out-of-sample bar the
+  Spine did — which is why most of the scorecard is red, and that is a feature.</p>
+
+  <h2><span class="n">7</span>Honest caveats</h2>
+  <p>Backtests are historical / paper results on ETF and equity proxies, net of modeled costs; they are
+  not indicative of future results. Tail and earnings findings are <em>especially</em> sample-dependent —
+  the window holds a single sharp crash (COVID) and a single inflation bear (2022). Several "positive"
+  research results (inverse carry, short-duration hedges) lean on that 2022 window and should be read as
+  <em>shapes</em>, not promises. The validated core is single-digit-CAGR, ~1.0-Sharpe money; there is no
+  double-digit-return-at-low-risk configuration, and this program says so plainly.</p>
+
+  <div class="foot">
+    Companion documents — validated methods &amp; math: <b>docs/whitepaper.html</b>, <b>docs/FINANCIAL_METHODS.md</b>.
+    Research notes: <b>docs/research_thread_summary.pdf</b>, <b>docs/barbell_note.pdf</b>, <b>docs/research_frontier.html</b>.
+    Decisions: <b>docs/CANONICAL_ARCHITECTURE.md</b>. Reproducible sketches: <b>scripts/research/</b> (11 scripts).
+    Reference implementation (Julia): the Blaque Baux repository.
+    <div class="disc">Not investment advice. Educational/research software describing thought exercises and a
+    paper-traded strategy, not a fund or an offer. All figures are historical backtests or paper-trading
+    results, net of modeled costs — not indicative of future results. Trading carries substantial risk,
+    including loss of principal. © 2026 Carter Warrens · MIT-licensed.</div>
+  </div>
+</div>

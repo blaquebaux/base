@@ -41,6 +41,30 @@ carries proportional (double-digit) drawdown, and is net-negative at today's mar
 trade-off is quantified in [`docs/leverage_decision.html`](docs/leverage_decision.html). There is
 no double-digit-return-at-low-risk configuration, and this repo says so.
 
+## The research program — 20+ strategies, one honest scorecard
+
+The spine is the *survivor* of a much larger program. This repo is a research corpus: two dozen
+strategies were built and tested across return-prediction, convexity / tail-hedging, correlation
+structure, and leverage — and most were **rejected, on the record, with the reason.** The complete
+white paper is the map:
+
+### → [`docs/compendium.html`](docs/compendium.html) · [PDF](docs/compendium.pdf) — *The Complete Method*
+
+| Status | # | Examples |
+|---|---|---|
+| **Live / production** | 2 | the spine; DBA agriculture sleeve |
+| **In live A/B** | 2 | multi-horizon trend; split-universe spine |
+| **Research (kept)** | 5 | Taleb barbell / the "curveball"; inverse-carry tail hedge; diversified tail hedge; Gamma-ARMA regime framework; the optimizer library |
+| **Tested & rejected** | 10+ | Bayesian & cross-sectional alpha; blue-chip / mid-cap prediction; 15-min alpha; earnings lead-lag; pairs stat-arb; vol-overlay hedge; carry sleeve; leverage-to-double-digits |
+
+Ten durable laws came out of it — e.g. *convexity is free (trend) or paid (long-vol), never both cheap
+and fast*; *timing the tail removes the tail*; *correlation is priced instantly — a risk tool, not
+alpha*; *aggression multiplies edge, and with none it multiplies only ruin*. Every result is a
+reproducible sketch in [`scripts/research/`](scripts/research/) (11 scripts), consolidated in
+[`docs/research_thread_summary.pdf`](docs/research_thread_summary.pdf).
+
+**That most of the scorecard is red is the point** — a strategy is only as trustworthy as the ideas it was willing to kill.
+
 ## The mathematics
 
 Everything — covariance estimation, the sleeve construction, risk metrics (Sharpe/Sortino/Calmar/
@@ -115,9 +139,12 @@ scripts/
   run_spine_daily.sh    launchd wrapper (scheduled pre-open run)
   spine_end_to_end.jl   full pipeline on cached data (integration demo)
 docs/
-  FINANCIAL_METHODS.md      the math (start here)
+  compendium.html           THE COMPLETE METHOD — every strategy, scored (start here for breadth)
+  FINANCIAL_METHODS.md      the validated math (start here for depth)
   CANONICAL_ARCHITECTURE.md architecture & decisions
+  research_thread_summary.pdf  consolidated convexity/correlation/leverage findings
   leverage_decision.html    interactive leverage trade-off visual
+scripts/research/          11 reproducible research sketches (the scorecard's evidence)
 test/                    gate + (quarantined legacy) suites
 ```
 
