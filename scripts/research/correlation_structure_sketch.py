@@ -17,6 +17,10 @@
 #   3. The bank TIER ladder (T1 US GSIB, T1 Global ADRs, T2 super-regional, T3 regional,
 #      T4 community) — US banks are ~0.8–0.95 one factor across every tier; geography (global) and
 #      extreme size (community) are the only mildly-distinct pockets; beta shrinks with size.
+#   4. Regulation & homogeneity (the WHY) — within-industry correlation ranked across 8 industries.
+#      Prudential/structural regulation (banks, utilities, insurance) OR a common input (airlines:
+#      fuel; semis: cycle) forces homogeneity → high correlation; product regulation with idiosyncratic
+#      outcomes (pharma/biotech under the FDA) does NOT. Correlation ∝ shared FORCED exposure.
 #
 # Findings are directional; a tail/earnings backtest is dominated by which events fell in the window.
 # Reads keys from env (ALPACA_KEY_ID / ALPACA_SECRET_KEY). Read-only; never trades.
@@ -102,5 +106,31 @@ def section3_tiers():
     print("  lives across ASSET CLASSES, not across names/sectors/tiers within equities.")
 
 
+def section4_regulation():
+    print("\n" + "=" * 70, "\n4. REGULATION & HOMOGENEITY — why some industries are one factor\n" + "=" * 70)
+    IND = {
+        "Utilities (rate-reg)":       ["NEE","DUK","SO","D","AEP","EXC"],
+        "Banks (prudential-reg)":     ["JPM","BAC","C","WFC","GS","MS"],
+        "Insurance (solvency-reg)":   ["MET","PRU","AIG","ALL","TRV","CB"],
+        "Airlines (safety; 1 fuel)":  ["DAL","UAL","AAL","LUV","ALK"],
+        "Semiconductors (light reg)": ["NVDA","AMD","INTC","MU","AVGO","QCOM","TXN"],
+        "Big Tech (light reg)":       ["AAPL","MSFT","GOOGL","AMZN","META","NVDA"],
+        "Big Pharma (FDA product)":   ["PFE","MRK","JNJ","BMY","ABBV","LLY"],
+        "Biotech (FDA; idiosyncr.)":  ["VRTX","REGN","GILD","BIIB","AMGN","MRNA"],
+    }
+    allsyms = sorted({s for v in IND.values() for s in v} | {"SPY"})
+    used, dts, R = rets(allsyms); i = {s: used.index(s) for s in used}; spy = R[:, i["SPY"]]
+    def st(t):
+        idx = [i[s] for s in IND[t] if s in used]; C = np.corrcoef(R[:, idx].T)
+        return C[np.triu_indices(len(idx), 1)].mean(), np.mean([corr(R[:, j], spy) for j in idx])
+    print(f"  {'industry':<28}{'within-corr':>12}{'→SPY':>7}")
+    for t, w, b in sorted(((t,) + st(t) for t in IND), key=lambda x: -x[1]):
+        print(f"  {t:<28}{w:>12.2f}{b:>7.2f}")
+    print("\n  Law: correlation ∝ shared FORCED exposure. Prudential/structural regulation (banks, utils,")
+    print("  insurance) or a common input (airlines: fuel; semis: cycle) homogenizes firms → high corr;")
+    print("  product regulation with idiosyncratic outcomes (pharma/biotech under the FDA) does NOT —")
+    print("  each firm's fate is its own, so they stay uncorrelated despite heavy oversight.")
+
+
 if __name__ == "__main__":
-    section1_sectors(); section2_leadlag(); section3_tiers()
+    section1_sectors(); section2_leadlag(); section3_tiers(); section4_regulation()
