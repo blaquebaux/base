@@ -1,4 +1,4 @@
-<title>Blaque Baux — The Complete Method</title>
+<title>Blaque Baux: The Complete Method</title>
 <style>
   @page{ margin:16mm 14mm 18mm; }
   @media print{
@@ -55,146 +55,160 @@
   <div class="eyebrow">Blaque Baux · Research Compendium</div>
   <h1>The complete method</h1>
   <p class="dek">The full body of work behind a single-strategy platform: every approach explored,
-  validated, or rejected — and the discipline that decided. Twenty-plus strategies, one honest
-  scorecard, and the reason only a few of them ship.</p>
-  <div class="byline">by <b>Carter Warrens</b> · 2026 · reference implementation in Julia · figures are historical backtests / paper results on ETF and equity data</div>
+  validated, or rejected, and the discipline that decided. Twenty-plus strategies, one honest
+  scorecard, and the reason only a few of them will ship.</p>
+  <div class="byline">by <b>Carter Warrens</b> · 2026 · reference implementation in Julia · figures are historical backtests and paper results on ETF and equity data</div>
 
   <div class="rule"></div>
   <div class="abstract">
     <span class="lab">The program in one paragraph</span>
-    Blaque Baux began as an alpha-prediction system and became a risk-premium harvester, because
-    <b>rigorous out-of-sample testing found no exploitable predictive edge</b> at the horizons and
-    instruments we can access — a result we reproduced a dozen ways (cross-sectional factors, Bayesian
-    filtering, 15-minute signals, cross-industry lead-lag, pairs arbitrage: all coin flips). What
-    <em>survives</em> is <b>risk structure</b> — diversification and trend premia, harvested by a
-    governed daily process. Around that core we ran a deep second program on <b>convexity and tail
-    protection</b>, on <b>correlation structure</b>, and on <b>aggression and leverage</b>, each ending
-    in a durable, often counter-intuitive law. This paper is the map of all of it: what shipped, what is
-    in live testing, what was kept as research, and — just as prominently — what was tested and rejected,
-    with the reason. The honesty is the point: a strategy is only as trustworthy as the ideas it was
-    willing to kill.</p>
+    Blaque Baux began as an alpha-prediction system and became a risk-premium harvester. The reason:
+    rigorous out-of-sample testing found no exploitable predictive edge at the horizons and instruments
+    we can access. We reproduced that null result a dozen ways. Cross-sectional factors, Bayesian
+    filtering, 15-minute signals, cross-industry lead-lag, and pairs arbitrage were all coin flips. What
+    <em>survives</em> is <b>risk structure</b>: diversification and trend premia, harvested by a governed
+    daily process. Around that core we ran a deep second program on <b>convexity and tail protection</b>,
+    on <b>correlation structure</b>, and on <b>aggression and leverage</b>, each ending in a durable,
+    often counter-intuitive law. This paper is the map of all of it: what shipped, what is in live
+    testing, what was kept as research, and, just as prominently, what was tested and rejected, with the
+    reason. The honesty is the point. A strategy is only as trustworthy as the ideas it was willing to
+    kill.</p>
   </div>
 
   <h2><span class="n">1</span>The founding finding</h2>
-  <p>On 60-day 15-minute data (~1,547 bars × 60 S&amp;P names), two independent alpha models scored
-  <b>50.9%</b> and <b>50.7%</b> directional accuracy — coin flips, information coefficient ≈ 0. We then
-  reproduced the null across blue-chip and mid-cap universes, cross-industry lead-lag, and pairs
-  mean-reversion. The conclusion was not "try harder"; it was <b>structural</b>: at retail-accessible
-  horizons and costs, the market has already priced what's knowable. So the platform stopped forecasting
-  returns and started harvesting the premia paid for <em>bearing risk</em> — diversification, trend,
-  term/asset premia — where an out-of-sample edge genuinely survives.</p>
+  <p>On 60-day 15-minute data (about 1,547 bars across 60 S&amp;P names), two independent alpha models
+  scored <b>50.9%</b> and <b>50.7%</b> directional accuracy. Both were coin flips, with an information
+  coefficient near zero. We then reproduced the null across blue-chip and mid-cap universes,
+  cross-industry lead-lag, and pairs mean-reversion. The conclusion was not "try harder"; it was
+  <b>structural</b>. At retail-accessible horizons and costs, the market has already priced what is
+  knowable. So the platform stopped forecasting returns and started harvesting the premia paid for
+  <em>bearing risk</em> (diversification, trend, term and asset premia), where an out-of-sample edge
+  genuinely survives.</p>
 
   <h2><span class="n">2</span>The scorecard</h2>
-  <p class="lede">Every strategy and idea explored, with its verdict and status. Green = live or graduating;
-  amber = kept as research; red = tested and rejected. This is the whole program at a glance.</p>
+  <p class="lede">As shown below is every strategy and idea explored, with its verdict and status. Green
+  is live or graduating, amber is kept as research, red is tested and rejected. This is the whole program
+  at a glance.</p>
   <table>
     <thead><tr><th style="width:22%">Strategy / idea</th><th style="width:15%">Category</th><th>Finding</th><th style="width:14%">Status</th></tr></thead>
     <tbody>
       <tr class="grp"><td colspan="4">Live &amp; production</td></tr>
-      <tr><td><b>The Spine</b> (inverse-vol/ERC base + 12-mo TSMOM trend + vol-target + regime brake)</td><td>Risk-premium harvest</td><td>Sharpe ≈ 0.97, maxDD ≈ −11%, 2022 −1.4%; trend sleeve carries crises. Forecasts nothing.</td><td class="v-live">LIVE</td></tr>
-      <tr><td><b>DBA</b> (agriculture) 6th sleeve</td><td>Diversification</td><td>Only genuinely-uncorrelated add tested (0.44 vs DBC); Sharpe 0.94→1.04.</td><td class="v-live">LIVE</td></tr>
-      <tr class="grp"><td colspan="4">Graduated — in live paper A/B (3 isolated accounts)</td></tr>
-      <tr><td><b>Multi-horizon trend</b> (3/6/12-mo agreement)</td><td>Funded convexity</td><td>Strict improvement: Sharpe 1.04→1.16, drawdown −8.9→−7.0%, more convex, no cost.</td><td class="v-ab">A/B</td></tr>
-      <tr><td><b>Split-universe spine</b> (base vs trend on different universes)</td><td>Breadth</td><td>Trend on a broad shortable CTA set → Sharpe ≈ 1.12, lower vol; substitutes with multi-horizon.</td><td class="v-ab">A/B</td></tr>
+      <tr><td><b>The Spine</b> (inverse-vol/ERC base + 12-mo TSMOM trend + vol-target + regime brake)</td><td>Risk-premium harvest</td><td>Sharpe ≈ 0.97, maxDD ≈ −11%, 2022 −1.4%. The trend sleeve carries crises. Forecasts nothing.</td><td class="v-live">LIVE</td></tr>
+      <tr><td><b>Agriculture sleeve</b> (DBA, the DB Agriculture Fund) as a 6th holding</td><td>Diversification</td><td>The only genuinely uncorrelated add tested (0.44 correlation to broad commodities). Sharpe 0.94 → 1.04.</td><td class="v-live">LIVE</td></tr>
+      <tr class="grp"><td colspan="4">Graduated: live paper A/B (three isolated accounts)</td></tr>
+      <tr><td><b>Multi-horizon trend</b> (3/6/12-mo agreement)</td><td>Funded convexity</td><td>Strict improvement: Sharpe 1.04 → 1.16, drawdown −8.9% → −7.0%, more convex, no cost.</td><td class="v-ab">A/B</td></tr>
+      <tr><td><b>Split-universe spine</b> (base and trend on different universes)</td><td>Breadth</td><td>Trend on a broad shortable CTA set gives Sharpe ≈ 1.12 at lower vol. Substitutes with multi-horizon.</td><td class="v-ab">A/B</td></tr>
       <tr class="grp"><td colspan="4">Reviewed, kept as research (not deployed)</td></tr>
-      <tr><td><b>Taleb barbell / the "curveball"</b> (90/10 and reversed 10/90 convex sliver)</td><td>Convexity</td><td>A dark horse: bleeds, ruin if compounded, but +237% in COVID on its 10%. Hold, don't time.</td><td class="v-res">RESEARCH</td></tr>
-      <tr><td><b>Inverse carry</b> (short high-carry = short the premium)</td><td>Tail hedge</td><td>Positive-skew hedge that catches the rate/credit crisis (2022) VIXY misses.</td><td class="v-res">RESEARCH</td></tr>
-      <tr><td><b>Diversified tail hedge</b> (across crisis regimes)</td><td>Convexity</td><td>Deflation + inflation hedges are anti-correlated → a sliver positive in <em>every</em> crisis.</td><td class="v-res">RESEARCH</td></tr>
-      <tr><td><b>Gamma-ARMA regime framework</b> (Bayesian regime over ARMA/GARCH space)</td><td>Regime / risk</td><td>Sophisticated, specified, <em>unvalidated</em> (backtest never run). Path-A funded research.</td><td class="v-res">RESEARCH</td></tr>
-      <tr><td><b>Optimizer library</b> (Markowitz, Black-Litterman, CVaR/CDaR, HRP, Michaud, cost-aware)</td><td>Infrastructure</td><td>General-purpose portfolio-optimization stack + REST service; the spine is one strategy on it.</td><td class="v-res">TOOL</td></tr>
-      <tr class="grp"><td colspan="4">Tested &amp; rejected — return prediction (alpha)</td></tr>
-      <tr><td>3-factor cross-sectional &amp; Bayesian (Kalman/NIG/James-Stein/ADVI) alpha</td><td>Alpha</td><td>50.9% / 50.7% accuracy, IC ≈ 0 — coin flips. Archived.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Blue-chip &amp; mid/small-cap directional prediction</td><td>Alpha</td><td>Blue-chip a coin flip; mid-cap only short-horizon reversal (not tradeable at cost).</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>15-minute intraday alpha</td><td>Alpha</td><td>Noise (50.9%); intraday cadence adds nothing — diversification is the shock absorber.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Lead-lag / earnings read-through (NVDA→semis, banks, tech)</td><td>Alpha</td><td>Priced same-day (corr 0.7–0.9), next-day ≈ 0; in tech it <em>reverses</em> (chasing loses).</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Pairs / relative-value mean-reversion (stat-arb)</td><td>Alpha</td><td>Diversified book ≈ 0.15 Sharpe (noise); many "pairs" drift apart permanently.</td><td class="v-no">REJECTED</td></tr>
-      <tr class="grp"><td colspan="4">Tested &amp; rejected — convexity, carry, leverage</td></tr>
-      <tr><td>Vol-aware VIXY tail overlay on the Spine</td><td>Paid convexity</td><td>Hurts — the Spine's trend is already a crisis hedge; VIXY carry is a drawdown machine.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Convex response function (size by trend strength²)</td><td>Convexity</td><td>Backfires — levers calm uptrends, flattens skew. Convexity must be in the payoff.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Carry sleeve as a third premium</td><td>Risk premium</td><td>Genuinely uncorrelated (−0.02) but negative-expectancy + negative skew → lowers Sharpe.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Carry as the barbell's earning sleeve</td><td>Convexity</td><td>Crashes when the convex sleeve pays — eats the payoff. Safe sleeve must be inert.</td><td class="v-no">REJECTED</td></tr>
-      <tr><td>Leverage to double-digit returns</td><td>Aggression</td><td>Net-negative at retail financing; Kelly ≈ 1×; higher leverage = ruin, not riches.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td><b>Gamma-ARMA regime framework</b> (Bayesian regime over ARMA/GARCH space)</td><td>Regime / risk</td><td>Sophisticated and specified, but <em>unvalidated</em> (its backtest was never run). Path-A funded research.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Taleb barbell</b> (90% safe / 10% convex)</td><td>Convexity</td><td>Paid insurance that works: skew +2.1, positive in every crisis (+19% in the COVID crash while equities fell 33%), at a bleed of about 3%/yr.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>The "curveball"</b> (reversed barbell, a 10/90 convex sliver)</td><td>Convexity</td><td>A dark horse: ruin if compounded (−44%/yr) but +237% in the COVID crash on its 10% weight. Hold it, let it bleed, never time it.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Inverse carry</b> (short high-carry, i.e. short the premium)</td><td>Tail hedge</td><td>A positive-skew hedge (skew flips −2.1 to +2.1) that catches the rate/credit crisis (2022 +5%) VIXY misses.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Diversified tail hedge</b> (across crisis regimes)</td><td>Convexity</td><td>Deflation and inflation hedges are anti-correlated (−0.3), so a blended sliver is positive in <em>every</em> crisis.</td><td class="v-res">RESEARCH</td></tr>
+      <tr><td><b>Optimizer library</b> (Markowitz, Black-Litterman, CVaR/CDaR, HRP, Michaud, cost-aware)</td><td>Infrastructure</td><td>A general-purpose portfolio-optimization stack plus REST service. The spine is one strategy built on it.</td><td class="v-res">TOOL</td></tr>
+      <tr class="grp"><td colspan="4">Tested &amp; rejected: return prediction (alpha)</td></tr>
+      <tr><td>3-factor cross-sectional &amp; Bayesian (Kalman/NIG/James-Stein/ADVI) alpha</td><td>Alpha</td><td>50.9% and 50.7% directional accuracy, IC ≈ 0. Coin flips. Archived.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Blue-chip &amp; mid/small-cap directional prediction</td><td>Alpha</td><td>Blue-chip 12-mo momentum 52.1% (IC-IR 1.78, below the 2.0 significance bar); mid-cap momentum negative at 48.3%, worse than a coin.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>15-minute intraday alpha</td><td>Alpha</td><td>50.9% accuracy, noise. Intraday cadence adds nothing, since diversification is the real shock absorber.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Lead-lag / earnings read-through (NVDA→semis, banks, tech)</td><td>Alpha</td><td>Priced same-day (corr 0.7 to 0.9), next-day ≈ 0. In tech it reverses: chasing a MSFT/GOOG pop returned −1.1% vs a +0.4% baseline.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Pairs / relative-value mean-reversion (stat-arb)</td><td>Alpha</td><td>Diversified book ≈ 0.15 Sharpe after costs, i.e. noise. Many "pairs" drift apart permanently (KO/PEP reversion half-life 3,800 days).</td><td class="v-no">REJECTED</td></tr>
+      <tr class="grp"><td colspan="4">Tested &amp; rejected: convexity, carry, leverage</td></tr>
+      <tr><td>Vol-aware VIXY tail overlay on the Spine</td><td>Paid convexity</td><td>Hurts: cut CAGR from 5.9% to 1.5% and deepened drawdown from −8.9% to −18.3%. The Spine's trend is already a crisis hedge; VIXY carry is a drawdown machine.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Convex response function (size by trend strength²)</td><td>Convexity</td><td>Backfires: flattened sleeve skew from +0.47 to −0.08 and deepened drawdown to −19.5%. Convexity must live in the payoff, not the sizing.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Carry sleeve as a third premium</td><td>Risk premium</td><td>Genuinely uncorrelated (−0.02 to base) but negative-expectancy with negative skew (−2.5), so it lowered the blended Sharpe from 1.16 to 0.96.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Carry as the barbell's earning sleeve</td><td>Convexity</td><td>Crashes when the convex sleeve pays, eating the payoff: COVID capture shrank from +17% to +6% and 2022 turned from +2% to −3%.</td><td class="v-no">REJECTED</td></tr>
+      <tr><td>Leverage to double-digit returns</td><td>Aggression</td><td>Net-negative at retail financing: 3× cuts CAGR to 3.9% at a −38% drawdown. Reaching double-digit CAGR needs about 3×, i.e. a −39% drawdown. Kelly ≈ 1×.</td><td class="v-no">REJECTED</td></tr>
     </tbody>
   </table>
 
   <h2><span class="n">3</span>What's live, and what's graduating</h2>
-  <p><b>Production:</b> the Spine — a two-sleeve book (inverse-vol/ERC base + 12-month time-series-momentum
-  trend), each volatility-targeted on its own realized P&amp;L, blended 50/50 and scaled by a drawdown
-  regime brake, rebalanced once daily and routed through a governed execution layer. Net of costs it
-  delivers a Sharpe near 1.0 at ~11% maximum drawdown, with the trend sleeve making money in 2022 while a
-  long book bled. It now trades six assets (SPY / IEF / TLT / GLD / DBC / DBA).</p>
-  <p><b>In live A/B (three isolated paper accounts):</b> single-sign (the control), split-universe, and
-  single-multi-horizon — so the two candidate upgrades are measured head-to-head against production on
-  real fills, each with its own state, ledger, and safety files. Nothing graduates to funded capital
-  until it clears out-of-sample / purged cross-validation.</p>
+  <p><b>Production:</b> the Spine, a two-sleeve book (inverse-vol/ERC base plus 12-month
+  time-series-momentum trend). Each sleeve is volatility-targeted on its own realized P&amp;L, blended
+  50/50, and scaled by a drawdown regime brake, then rebalanced once daily and routed through a governed
+  execution layer. Net of costs it delivers a Sharpe near 1.0 at about 11% maximum drawdown, with the
+  trend sleeve making money in 2022 while a long book bled. It now trades six assets (SPY, IEF, TLT, GLD,
+  DBC, DBA).</p>
+  <p><b>In live A/B</b> (three isolated paper accounts): single-sign (the control), split-universe, and
+  single-multi-horizon. The two candidate upgrades are measured head-to-head against production on real
+  fills, each with its own state, ledger, and safety files. Nothing graduates to funded capital until it
+  clears out-of-sample and purged cross-validation.</p>
 
   <h2><span class="n">4</span>The research themes</h2>
-  <h3>Return prediction — the null result, five ways</h3>
-  <p>Every route to forecasting returns landed in the same place: cross-sectional factors, Bayesian
-  filtering, blue-chip and mid-cap direction, 15-minute signals, cross-industry lead-lag, and pairs
-  arbitrage. The consistency <em>is</em> the evidence — the market prices what's knowable, instantly.</p>
-  <h3>Convexity &amp; tail hedging — free vs paid</h3>
-  <p>The deepest thread. Convexity comes in two forms: <b>free</b> (trend/momentum, funded by the
-  momentum premium — protects sustained crises, improves return) and <b>paid</b> (long-vol/short-carry,
-  funded by decay — protects sharp crashes, but bleeds and can't be timed). A paid overlay <em>hurts</em>
-  the Spine (it already owns free convexity); making the trend sleeve multi-horizon is the win. The best
-  standalone hedge is <b>diversified across crisis regimes</b> — deflation (VIXY, short-credit) and
-  inflation (short-duration, long-commodities) are anti-correlated, so a small sliver has no blind spot.</p>
-  <h3>Correlation structure — real, but priced</h3>
-  <p>Industries, supply chains, and firms are strongly correlated (sectors ~0.62, banks ~0.87) — but the
-  read-through is <em>instantaneous</em>, so it's a risk tool, not an alpha source. And correlation ∝
-  <b>shared forced exposure</b>: prudential regulation (banks, utilities) or a common input (airlines:
-  fuel) homogenizes firms into one factor, while product regulation with idiosyncratic outcomes (pharma,
-  biotech under the FDA) leaves them uncorrelated despite heavy oversight.</p>
-  <h3>Aggression &amp; leverage — the growth-vs-ruin frontier</h3>
+  <h3>Return prediction: the null result, reproduced</h3>
+  <p>Every route to forecasting returns landed in the same place. The two original alpha engines scored
+  <b>50.9%</b> and <b>50.7%</b> directional accuracy on 15-minute data, a coin flip with information
+  coefficient near zero. Blue-chip 12-month momentum managed only <b>52.1%</b> with a t-statistic of
+  <b>1.78</b>, below the significance bar of 2.0; mid-cap momentum was outright negative at <b>48.3%</b>.
+  Cross-industry read-through was priced the <em>same day</em> (correlation 0.7 to 0.9) with next-day
+  predictability near zero, and negative in tech, where chasing a Microsoft or Google earnings pop
+  returned <b>−1.1%</b> against a +0.4% baseline. A diversified pairs-arbitrage book netted <b>0.15
+  Sharpe</b> after costs, indistinguishable from noise. Five independent methods, one answer. That
+  consistency is the real evidence: at horizons and costs a retail participant can reach, the market has
+  already priced what is knowable, and it prices it instantly. So we stopped forecasting and built around
+  the risk premia that survive.</p>
+  <h3>Convexity and tail hedging: free vs paid</h3>
+  <p>The deepest thread. Convexity comes in two forms. <b>Free</b> convexity (trend and momentum, funded
+  by the momentum premium) protects sustained crises and improves return. <b>Paid</b> convexity (long
+  volatility or short carry, funded by decay) protects sharp crashes but bleeds and cannot be timed. A
+  paid overlay <em>hurts</em> the Spine, which already owns free convexity; making the trend sleeve
+  multi-horizon is the win instead. The best standalone hedge is diversified across crisis regimes:
+  deflation (VIXY, short-credit) and inflation (short-duration, long-commodities) are anti-correlated, so
+  a small sliver has no blind spot.</p>
+  <h3>Correlation structure: real, but priced</h3>
+  <p>Industries, supply chains, and firms are strongly correlated (sectors about 0.62, big banks about
+  0.87), but the read-through is <em>instantaneous</em>, which makes it a risk tool rather than an alpha
+  source. And correlation is proportional to <b>shared forced exposure</b>: prudential regulation (banks,
+  utilities) or a common input (airlines share one fuel) homogenizes firms into one factor, while product
+  regulation with idiosyncratic outcomes (pharma and biotech under the FDA) leaves them uncorrelated
+  despite heavy oversight.</p>
+  <h3>Aggression and leverage: the growth-vs-ruin frontier</h3>
   <p>"Most aggressive" has a principled ceiling (Kelly) and a brutal catch: aggression multiplies edge,
   and ours is modest. At retail financing, leverage <em>lowers</em> growth; a max-aggressive convex bet
-  has a median terminal wealth below the stake. Rational aggression is fractional Kelly on real edge — or
-  a small barbell sleeve — never all-in.</p>
+  has a median terminal wealth below the stake. Rational aggression is fractional Kelly on real edge, or
+  a small barbell sleeve, never all-in.</p>
   <h3>The archived alpha track</h3>
   <p>The original Bayesian alpha engine, a Monte-Carlo risk simulator, a Sharpe-on-historical-means
-  "Oracle," and the Gamma-ARMA regime framework are preserved but archived — the mathematics is sound,
-  the measured edge was not there. Sophisticated machinery <em>packages and sizes</em> a signal; it does
-  not <em>create</em> one.</p>
+  "Oracle," and the Gamma-ARMA regime framework are preserved but archived. The mathematics is sound; the
+  measured edge was not there. Sophisticated machinery <em>packages and sizes</em> a signal. It does not
+  <em>create</em> one.</p>
 
   <h2><span class="n">5</span>The durable laws</h2>
-  <p>The findings that survive the small-sample caveats — directional and structural, the real output of the program.</p>
-  <div class="law"><b>I.</b> At tradeable horizons there is no exploitable return-prediction edge — so harvest premia, don't forecast.</div>
-  <div class="law"><b>II.</b> Convexity is <em>free</em> (trend → sustained crises) or <em>paid</em> (long-vol → sharp crises); no instrument gives cheap, timed, crash-day protection.</div>
-  <div class="law"><b>III.</b> Timing the tail removes the tail — every rule that trims a hedge's bleed also removes its payoff.</div>
-  <div class="law"><b>IV.</b> Diversification is necessary but not sufficient — an uncorrelated stream only helps if it is positive-expectancy.</div>
-  <div class="law"><b>V.</b> A hedge's safe sleeve must be inert in a crisis; anything with hidden crisis-beta is not safe.</div>
-  <div class="law"><b>VI.</b> There are two crisis regimes (deflation, inflation); they are anti-correlated and need opposite hedges.</div>
-  <div class="law"><b>VII.</b> Aggression multiplies edge — with none, it multiplies only ruin (Kelly ≈ 1× here).</div>
-  <div class="law"><b>VIII.</b> Correlation is real and priced instantly — a risk tool, not an alpha source.</div>
-  <div class="law"><b>IX.</b> Correlation ∝ shared forced exposure (prudential regulation or a common input); idiosyncratic outcomes decorrelate.</div>
-  <div class="law"><b>X.</b> The discipline — validate out-of-sample, then deploy — is the actual product; a strategy is only as trustworthy as the ideas it killed.</div>
+  <p>The findings that survive the small-sample caveats. Directional and structural, they are the real output of the program.</p>
+  <div class="law"><b>I.</b> At tradeable horizons there is no exploitable return-prediction edge, so harvest premia rather than forecast.</div>
+  <div class="law"><b>II.</b> Convexity is either <em>free</em> (trend, for sustained crises) or <em>paid</em> (long-vol, for sharp crises). No instrument gives cheap, timed, crash-day protection.</div>
+  <div class="law"><b>III.</b> Timing the tail removes the tail. Every rule that trims a hedge's bleed also removes its payoff.</div>
+  <div class="law"><b>IV.</b> Diversification is necessary but not sufficient. An uncorrelated stream only helps if it is positive-expectancy.</div>
+  <div class="law"><b>V.</b> A hedge's safe sleeve must be inert in a crisis. Anything with hidden crisis-beta is not safe.</div>
+  <div class="law"><b>VI.</b> There are two crisis regimes, deflation and inflation. They are anti-correlated and need opposite hedges.</div>
+  <div class="law"><b>VII.</b> Aggression multiplies edge. With none, it multiplies only ruin (Kelly is about 1× here).</div>
+  <div class="law"><b>VIII.</b> Correlation is real and priced instantly. It is a risk tool, not an alpha source.</div>
+  <div class="law"><b>IX.</b> Correlation is proportional to shared forced exposure (prudential regulation or a common input); idiosyncratic outcomes decorrelate.</div>
+  <div class="law"><b>X.</b> The discipline, validate out-of-sample then deploy, is the actual product. A strategy is only as trustworthy as the ideas it killed.</div>
 
-  <h2><span class="n">6</span>Governance — the discipline is the product</h2>
+  <h2><span class="n">6</span>Governance: the discipline is the product</h2>
   <p>Every order passes one governed path enforcing hard, tested invariants: idempotency, per-pool budget
-  and daily-loss limits, data-staleness, position reconciliation, a kill switch, and full fill lineage —
-  beneath a pre-trade safety gate (drawdown/loss halts, gross-leverage and per-name caps, account and
-  data checks). No language model is anywhere near the order path; the strategy is reproducible code. The
-  autonomous daily job runs deterministically pre-open with morning catch-up fires, and reports its book
-  and P&amp;L to a comparison log. Nothing reaches capital without clearing the same out-of-sample bar the
-  Spine did — which is why most of the scorecard is red, and that is a feature.</p>
+  and daily-loss limits, data-staleness, position reconciliation, a kill switch, and full fill lineage,
+  all beneath a pre-trade safety gate (drawdown and loss halts, gross-leverage and per-name caps, account
+  and data checks). No language model is anywhere near the order path; the strategy is reproducible code.
+  The autonomous daily job runs deterministically pre-open with morning catch-up fires, and reports its
+  book and P&amp;L to a comparison log. Nothing reaches capital without clearing the same out-of-sample
+  bar the Spine did, which is why most of the scorecard is red. That is a feature.</p>
 
   <h2><span class="n">7</span>Honest caveats</h2>
-  <p>Backtests are historical / paper results on ETF and equity proxies, net of modeled costs; they are
-  not indicative of future results. Tail and earnings findings are <em>especially</em> sample-dependent —
-  the window holds a single sharp crash (COVID) and a single inflation bear (2022). Several "positive"
-  research results (inverse carry, short-duration hedges) lean on that 2022 window and should be read as
-  <em>shapes</em>, not promises. The validated core is single-digit-CAGR, ~1.0-Sharpe money; there is no
-  double-digit-return-at-low-risk configuration, and this program says so plainly.</p>
+  <p>Backtests are historical or paper results on ETF and equity proxies, net of modeled costs, and are
+  not indicative of future results. Tail and earnings findings are <em>especially</em> sample-dependent,
+  because the window holds a single sharp crash (COVID) and a single inflation bear (2022). Several
+  positive research results (inverse carry, short-duration hedges) lean on that 2022 window and should be
+  read as <em>shapes</em>, not promises. The validated core is single-digit-CAGR, roughly 1.0-Sharpe
+  money. There is no double-digit-return-at-low-risk configuration, and this program says so plainly.</p>
 
   <div class="foot">
-    Companion documents — validated methods &amp; math: <b>docs/whitepaper.html</b>, <b>docs/FINANCIAL_METHODS.md</b>.
+    Companion documents. Validated methods and math: <b>docs/whitepaper.html</b>, <b>docs/FINANCIAL_METHODS.md</b>.
     Research notes: <b>docs/research_thread_summary.pdf</b>, <b>docs/barbell_note.pdf</b>, <b>docs/research_frontier.html</b>.
     Decisions: <b>docs/CANONICAL_ARCHITECTURE.md</b>. Reproducible sketches: <b>scripts/research/</b> (11 scripts).
-    Reference implementation (Julia): the Blaque Baux repository.
-    <div class="disc">Not investment advice. Educational/research software describing thought exercises and a
-    paper-traded strategy, not a fund or an offer. All figures are historical backtests or paper-trading
-    results, net of modeled costs — not indicative of future results. Trading carries substantial risk,
-    including loss of principal. © 2026 Carter Warrens · MIT-licensed.</div>
+    Reference implementation in Julia: the Blaque Baux repository.
+    <div class="disc">Not investment advice. Educational and research software describing thought exercises
+    and a paper-traded strategy, not a fund or an offer. All figures are historical backtests or
+    paper-trading results, net of modeled costs, and are not indicative of future results. Trading carries
+    substantial risk, including loss of principal. © 2026 Carter Warrens · MIT-licensed.</div>
   </div>
 </div>

@@ -54,8 +54,8 @@ white paper is the map:
 |---|---|---|
 | **Live / production** | 2 | the spine; DBA agriculture sleeve |
 | **In live A/B** | 2 | multi-horizon trend; split-universe spine |
-| **Research (kept)** | 5 | Taleb barbell / the "curveball"; inverse-carry tail hedge; diversified tail hedge; Gamma-ARMA regime framework; the optimizer library |
-| **Tested & rejected** | 10+ | Bayesian & cross-sectional alpha; blue-chip / mid-cap prediction; 15-min alpha; earnings lead-lag; pairs stat-arb; vol-overlay hedge; carry sleeve; leverage-to-double-digits |
+| **Research (kept)** | 6 | Gamma-ARMA regime framework; Taleb barbell; the curveball; inverse-carry tail hedge; diversified tail hedge; the optimizer library |
+| **Tested & rejected** | 10 | Bayesian & cross-sectional alpha; blue-chip / mid-cap prediction; 15-min alpha; earnings lead-lag; pairs stat-arb; vol-overlay hedge; convex-response function; carry sleeve; carry-as-base; leverage-to-double-digits |
 
 Ten durable laws came out of it — e.g. *convexity is free (trend) or paid (long-vol), never both cheap
 and fast*; *timing the tail removes the tail*; *correlation is priced instantly — a risk tool, not
