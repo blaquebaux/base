@@ -31,3 +31,4 @@ logs/
 *.sqlite-journal
 *.jls
 *_audit.jsonl
+*audit*.jsonl
