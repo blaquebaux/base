@@ -180,6 +180,29 @@ universe, live-money graduation off paper, more governance coverage), *not* re-a
 components. Anything from the archive returns only if it clears the same out-of-sample edge bar the
 core was held to (§7). No archived component has cleared it yet — and this README will say so until one does.
 
+## The Blaque Baux family
+
+This repo is the base/blueprint. Each family repo consumes this engine as a git submodule
+and steers it at a different market — one platform, many directions:
+
+| Repo | Focus | State |
+|------|-------|-------|
+| **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
+| **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built |
+| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built |
+| **blaquebaux-brash** | aggressive: crypto, alternatives | scaffold |
+| **blaquebaux-bleed** | contrarian; positioned for the tails | scaffold |
+| **blaquebaux-bottom** | sub-small-cap / penny names | scaffold |
+| **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | scaffold |
+| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | scaffold |
+| **blaquebaux-bulk** | defense / military & adjacent | scaffold |
+| **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | scaffold |
+| **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
+
+Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
+`~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
+
 ## Contributing / using this
 
 You're welcome to study, fork, and build on this. If you deploy real capital, **validate
