@@ -10,6 +10,15 @@
 #   side. Per "go long the backwards ones", the sleeve is FLIPPED to long the
 #   bottom movers. Both the momentum and contrarian edges are tiny gross and do
 #   not survive daily-rebalance costs.
+# RESULTS AS TESTED (45-name basket, 1-day horizon, 2016-2026, gross of costs):
+#   long winners / short losers  (proposed momentum)   Sharpe -0.14   <- fails
+#   long losers  / short winners (contrarian)          Sharpe +0.14
+#   long the losers, long-only   (flipped)             Sharpe +0.97   CAGR +23.5%
+#     beta-neutral (minus basket)                       Sharpe +0.24   <- small real bounce
+#   5-day formation: momentum -0.07 | contrarian +0.07
+# Both the reversal edge and its inverse are tiny and would not survive daily
+# rebalance costs on a ~90-name L/S book. Point-in-time; may need modification
+# later. Documented so the test and both directions are on the record.
 # Directional research; gross of costs. Read-only.
 # =============================================================================
 import os, sys, numpy as np

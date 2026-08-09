@@ -5,10 +5,11 @@ premia over days-to-weeks; **Blunt** tests short-horizon (1-day to intraweek)
 tactical ideas. Same Path-A discipline: build it, test it honestly on real data,
 write down the verdict — including *what didn't work*.
 
-All sketches read Alpaca SIP daily bars (`ALPACA_KEY_ID` / `ALPACA_SECRET_KEY` from
-env), are read-only, and print their own results. Numbers below are **gross of
-costs** unless marked NET, over 2016–2026. The cross-sectional basket is 45 liquid
-S&P names (current constituents → mild survivorship bias; treat as directional).
+All sketches read Alpaca SIP bars (daily; **hourly for #6's intraday test**) from
+`ALPACA_KEY_ID` / `ALPACA_SECRET_KEY` in env, are read-only, and print their own
+results. Numbers are **gross of costs** unless marked NET; sample is 2016–2026
+(#6's intraday test is 2019–2026). The cross-sectional basket is 45 liquid S&P
+names (current constituents → mild survivorship bias; treat as directional).
 
 ```bash
 export $(grep -v '^#' ~/.config/blaquebaux/alpaca.env | xargs)   # or source it
@@ -25,7 +26,7 @@ python scripts/research/blunt/blunt_1_low_sharpe.py               # etc.
 | 3 | Asia / chip cascade → next-day US | overnight→intraday corr ≈0; TSM→SMH next-day corr −0.10 | ❌ priced instantly |
 | 4 | Crack spread (crude vs refined) | **crude→refiner lead-lag: NET Sharpe +1.06** (prototype) | ✅ built |
 | 5 | Short high Ulcer/Pain names | short −1.00; **flipped long** +1.00 gross, **beta-neutral +0.46** | 🟡→long: real edge |
-| 6 | Long Mon–Wed / short Thu–Fri | Sharpe +0.34…+0.84, mostly net-long beta | 🟡 monitor |
+| 6 | Long Mon→Wed-noon / short Wed-noon→Fri | intraday: proposed +0.50…+0.72 vs **just-hold +0.87…+1.06** | ❌ dominated by holding |
 
 ## The synthesis
 
@@ -44,6 +45,40 @@ after removing market beta:
   short-term contrarian signal of the three. The *drawdown* screen picks the best
   bounce candidates. This is the flipped idea worth developing (a beta-neutral
   loser-bounce sleeve).
+
+## Documented results — both directions, as tested
+
+For the record: every version that was run, working or not. These are **point-in-time**
+over the stated sample and may behave differently in other regimes or need
+modification later — but they were tested, and here is what came back.
+
+**#1 / #2 / #5 — cross-sectional (45-name basket, 2016–2026, gross of costs/borrow):**
+
+| Strategy | Short (proposed) | Long (flipped) | Long, beta-neutral |
+|---|---|---|---|
+| #1 lowest trailing-Sharpe | −0.88 Sharpe, −91% DD | +0.88, CAGR +19.6% | **−0.05** (pure beta) |
+| #1 highest trailing-Sharpe | −1.26 | +1.26 | +0.38 |
+| #2 movers, 1-day (winners vs losers) | momentum −0.14 | long-losers +0.97, CAGR +23.5% | **+0.24** (small bounce) |
+| #2 movers, 5-day formation | momentum −0.07 | contrarian +0.07 | — |
+| #5 highest Ulcer | −1.00 Sharpe, −96% DD | +1.00, CAGR +27.0% | **+0.46** (real edge) |
+| #5 highest Pain | −0.99 | +0.99 | +0.43 |
+
+Read: the **short** side is a loss-maker across the board (shorting recent losers,
+which bounce). The **long** side is positive but mostly market beta — except the
+**drawdown-based #5**, which keeps a genuine ~+0.46 beta-neutral edge.
+
+**#6 — intraweek, real intraday test (hourly SIP, Wed-noon pivot, 396 weeks 2019–2026, NET ~1bp/side):**
+
+| Index | Proposed (long first half / short second) | Benchmark: just hold Mon→Fri | leg A Mon→Wed-noon | leg B Wed-noon→Fri |
+|---|---|---|---|---|
+| SPY | +0.55 Sharpe, CAGR +7.6%, DD −26% | **+1.03, +16.3%** | +26.9 bp/wk | +6.5 bp/wk |
+| QQQ | +0.72, +13.2%, −39% | **+1.06, +21.3%** | +37.4 bp/wk | +5.7 bp/wk |
+| DIA | +0.50, +6.6%, −25% | **+0.87, +12.9%** | +23.0 bp/wk | +4.6 bp/wk |
+
+Read: the proposed short-the-second-half is **dominated by simply holding the week**.
+Leg B (the back half) is weaker but still *positive*, so shorting it fights the
+equity risk premium — the same "backwards" trap as #1/#2/#5. The first-half strength
+is real but only supports a long-only *tilt*, not a short.
 
 ## The one that got built: #4
 

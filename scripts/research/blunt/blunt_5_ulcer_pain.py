@@ -12,6 +12,15 @@
 #   Ulcer, beta-neutral, is ~+0.46 Sharpe — the strongest short-term contrarian
 #   (loser-bounce) signal of the flipped trio. The raw long leg is still mostly
 #   beta, but the drawdown screen genuinely selects the best bounce candidates.
+# RESULTS AS TESTED (45-name basket, 60d window, 2016-2026, gross of costs/borrow):
+#   short highest-Ulcer (proposed)   Sharpe -1.00   maxDD -96%    <- fails hard
+#   long  highest-Ulcer (flipped)    Sharpe +1.00   CAGR +27.0%
+#     beta-neutral (minus basket)    Sharpe +0.46                 <- real reversal edge
+#   short highest-Pain  (proposed)   Sharpe -0.99
+#   long  highest-Pain  (flipped)    Sharpe +0.99   beta-neutral +0.43
+# The flipped long keeps a genuine beta-neutral edge (best of the #1/#2/#5 trio) —
+# a candidate loser-bounce sleeve if built beta-neutral. Point-in-time; may need
+# modification later. Documented so the test and both directions are on the record.
 # Directional research; gross of borrow/costs. Read-only.
 # =============================================================================
 import os, sys, numpy as np

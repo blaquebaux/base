@@ -11,6 +11,14 @@
 #   positive gross, but the beta-neutral version (leg minus the equal-weight
 #   basket) shows the bounce is small — most of the long-leg return is just market
 #   beta, not selection alpha.
+# RESULTS AS TESTED (45-name basket, 60d Sharpe, 2016-2026, gross of costs/borrow):
+#   short lowest-Sharpe  (proposed)  Sharpe -0.88   maxDD -91%      <- fails hard
+#   long  lowest-Sharpe  (flipped)   Sharpe +0.88   CAGR +19.6%
+#     beta-neutral (minus basket)    Sharpe -0.05                   <- edge is pure beta
+#   short highest-Sharpe             Sharpe -1.26
+#   long  highest-Sharpe             Sharpe +1.26   beta-neutral +0.38
+# Point-in-time over this sample; may behave differently in other regimes or need
+# modification later. Documented so the test and both directions are on the record.
 # Directional research; gross of financing/borrow. Read-only.
 # =============================================================================
 import os, sys, numpy as np
