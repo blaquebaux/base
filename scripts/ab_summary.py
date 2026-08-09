@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 # =============================================================================
-# ab_summary.py — READ-ONLY Monday A/B check-in for the two paper books.
+# ab_summary.py — READ-ONLY Monday A/B check-in across all paper books.
 #
-# Queries BOTH Alpaca paper accounts (single +DBA spine, split-universe spine),
-# reads the day's job logs, and writes a side-by-side summary to
+# Queries every configured Alpaca paper account (single +DBA spine, split-universe
+# spine, single+multi-horizon spine, and the Blunt crude->refiner sleeve), each
+# skipped cleanly until its key file exists; reads the day's job logs, and writes
+# a side-by-side summary (each active leg vs the SINGLE control) to
 # logs/ab_summary_<YYYYMMDD>.txt (and stdout): equity, day P&L, gross exposure,
 # positions, and a job status flag (OK / HALTED / RECONCILE FAILED / NO-FILLS).
 # Never trades, never prints keys, exits 0 on any error.
@@ -27,6 +29,7 @@ STRATS = [  # label, env file, expected job logfile prefix
     ("SINGLE (sign)",    os.path.join(CFG, "alpaca.env"),       "spine"),
     ("SPLIT (universe)", os.path.join(CFG, "alpaca_split.env"), "spine_split"),
     ("MULTI (single+multi)", os.path.join(CFG, "alpaca_multi.env"), "spine_multi"),
+    ("BLUNT (crude->refiner)", os.path.join(CFG, "alpaca_blunt.env"), "blunt"),
 ]
 
 

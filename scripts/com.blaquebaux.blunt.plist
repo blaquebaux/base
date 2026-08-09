@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- FOURTH paper account: Blaque Baux Blunt sleeve #4 (crude->refiner lead-lag). Pre-open 09:24
+     + morning catch-ups (10:34/11:49/13:04), staggered a couple minutes off the other legs so the
+     accounts don't all hit Alpaca on the same minute. Time-only: the wrapper's trading-day gate
+     handles weekends and the catch-up guard makes all but the first placement a no-op. Skips until
+     ~/.config/blaquebaux/alpaca_blunt.env exists. PAPER only. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blaquebaux.blunt</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_blunt_daily.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>24</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>34</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>49</integer></dict>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>4</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_blunt.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_blunt.err</string>
+</dict>
+</plist>
