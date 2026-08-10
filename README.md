@@ -96,6 +96,14 @@ julia --project=. scripts/portfolio_server.jl     # optimizer backend on :8766
 python scripts/dashboard.py                        # dashboard UI on :8050
 ```
 
+A worked cross-family demo — [`scripts/research/multi_sleeve_portfolio.jl`](scripts/research/multi_sleeve_portfolio.jl) —
+runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over nine
+structurally different fragments (spine asset classes + Bio + Basel + the crude→refiner
+sleeve + a beta-hedged market-neutral sleeve). It quantifies the real diversification
+payoff: matching the best single sleeve's Sharpe (~1.2) at **half the drawdown** and
+without betting the book on any one sleeve — the spine's "harvest risk structure" thesis
+applied across the whole family (not manufactured alpha).
+
 Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
 *(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
 `module_1_data/data_feeds_production.jl`; the spine trades ETFs, not crypto assets.)*
