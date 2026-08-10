@@ -218,7 +218,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bitdollar** | crypto / dollar-crypto axis | scaffold |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | scaffold |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | scaffold |
-| **blaquebaux-brute-force** | names propped up by options/squeeze/flow | scaffold |
+| **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
 | **blaquebaux-block** | a basket of derivative strategies | scaffold |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
