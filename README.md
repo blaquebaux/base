@@ -199,7 +199,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built |
 | **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built |
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) |
-| **blaquebaux-bleed** | contrarian; positioned for the tails | scaffold |
+| **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | scaffold |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) |
