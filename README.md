@@ -202,7 +202,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | scaffold |
 | **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | scaffold |
-| **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | scaffold |
+| **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
 | **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | scaffold |
 | **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
 | **blaquebaux-apac** | Asia-Pacific | scaffold |
