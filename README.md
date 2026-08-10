@@ -208,7 +208,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | research done (Brown/Blue rotation keeper) |
 | **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) |
-| **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
+| **blaquebaux-bubble** | the AI complex viewed as one | research done (crowded factor; bubble not fadeable) |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
 | **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) |
