@@ -99,12 +99,18 @@ python scripts/dashboard.py                        # dashboard UI on :8050
 ```
 
 A worked cross-family demo — [`scripts/research/multi_sleeve_portfolio.jl`](scripts/research/multi_sleeve_portfolio.jl) —
-runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over nine
-structurally different fragments (spine asset classes + Bio + Basel + the crude→refiner
-sleeve + a beta-hedged market-neutral sleeve). It quantifies the real diversification
-payoff: matching the best single sleeve's Sharpe (~1.2) at **half the drawdown** and
-without betting the book on any one sleeve — the spine's "harvest risk structure" thesis
-applied across the whole family (not manufactured alpha).
+runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over the **full
+keeper set**: the five asset-class spine plus five reconstructed strategy keepers — the
+crude→refiner sleeve (CRACK), a beta-hedged market-neutral sleeve (BORE), a vol-scaled
+multi-horizon trend sleeve (TREND), the brown/blue camp rotation (CAMPROT), and the
+drawdown-bounce (DDBOUNCE). It quantifies the real diversification payoff: risk-parity
+now **beats** the best single (lucky) sleeve on both axes — **+1.48 Sharpe vs CRACK's
++1.20, at −8% drawdown vs −24%** — and the weights make the lesson blunt: the beta-heavy
+keepers (CAMPROT/DDBOUNCE, corr 0.75/0.79 to SPY) earn just 3–4% despite +0.88/+0.81
+standalone Sharpe, while the risk budget flows to the genuinely uncorrelated fragments
+(IEF 28%, TREND 22%, BORE 12%). High standalone Sharpe does **not** earn weight; low
+correlation does — the spine's "harvest risk structure" thesis applied across the whole
+family (not manufactured alpha).
 
 Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
 *(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
