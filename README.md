@@ -216,7 +216,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-apac** | Asia-Pacific | scaffold |
 | **blaquebaux-latam** | Latin America | scaffold |
 | **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) |
-| **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | scaffold |
+| **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
 | **blaquebaux-block** | a basket of derivative strategies | scaffold |
