@@ -195,10 +195,23 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bottom** | sub-small-cap / penny names | scaffold |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | scaffold |
-| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | scaffold |
+| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) |
 | **blaquebaux-bulk** | defense / military & adjacent | scaffold |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | scaffold |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
+| **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | scaffold |
+| **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
+| **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | scaffold |
+| **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | scaffold |
+| **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | scaffold |
+| **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
+| **blaquebaux-apac** | Asia-Pacific | scaffold |
+| **blaquebaux-latam** | Latin America | scaffold |
+| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | scaffold |
+| **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | scaffold |
+| **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | scaffold |
+| **blaquebaux-brute-force** | names propped up by options/squeeze/flow | scaffold |
+| **blaquebaux-block** | a basket of derivative strategies | scaffold |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
