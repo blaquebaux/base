@@ -212,9 +212,9 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
 | **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) |
-| **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
-| **blaquebaux-apac** | Asia-Pacific | scaffold |
-| **blaquebaux-latam** | Latin America | scaffold |
+| **blaquebaux-emea** | Europe, the Middle East & Africa | research done (null — US beta wearing a flag, 11 ETFs → 1.8 bets; FX drag; no rotation edge) |
+| **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) |
+| **blaquebaux-latam** | Latin America | research done (null — US/commodity beta, worst tail −55%, unhedgeable in-wrapper FX, rotation hurts) |
 | **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
