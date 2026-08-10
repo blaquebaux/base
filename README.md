@@ -100,17 +100,22 @@ python scripts/dashboard.py                        # dashboard UI on :8050
 
 A worked cross-family demo — [`scripts/research/multi_sleeve_portfolio.jl`](scripts/research/multi_sleeve_portfolio.jl) —
 runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over the **full
-keeper set**: the five asset-class spine plus five reconstructed strategy keepers — the
-crude→refiner sleeve (CRACK), a beta-hedged market-neutral sleeve (BORE), a vol-scaled
-multi-horizon trend sleeve (TREND), the brown/blue camp rotation (CAMPROT), and the
-drawdown-bounce (DDBOUNCE). It quantifies the real diversification payoff: risk-parity
-now **beats** the best single (lucky) sleeve on both axes — **+1.48 Sharpe vs CRACK's
-+1.20, at −8% drawdown vs −24%** — and the weights make the lesson blunt: the beta-heavy
-keepers (CAMPROT/DDBOUNCE, corr 0.75/0.79 to SPY) earn just 3–4% despite +0.88/+0.81
-standalone Sharpe, while the risk budget flows to the genuinely uncorrelated fragments
-(IEF 28%, TREND 22%, BORE 12%). High standalone Sharpe does **not** earn weight; low
-correlation does — the spine's "harvest risk structure" thesis applied across the whole
-family (not manufactured alpha).
+keeper set**: the five asset-class spine plus eight reconstructed keepers — crude→refiner
+(CRACK), beta-hedged market-neutral (BORE), vol-scaled multi-horizon trend (TREND),
+brown/blue camp rotation (CAMPROT), drawdown-bounce (DDBOUNCE), the drawdown-regime brake
+(REGIME), and two *paid-convexity* tail hedges, the Taleb barbell (BARBELL) and the
+vol-gated curveball (CURVEBALL). It surfaces **two** honest lessons. First, the
+return-earning keepers push the diversified book past the best single (lucky) sleeve, and
+the risk budget flows to the genuinely uncorrelated fragments (TREND corr −0.11, BORE
+−0.07), not the high-Sharpe *beta* sleeves (CAMPROT/DDBOUNCE, corr 0.75/0.79, earn ~3%) —
+high standalone Sharpe doesn't earn weight, low correlation does. Second, the paid-convexity
+keepers are negative-carry **insurance** (negative standalone Sharpe, big positive skew,
+positive COVID capture; CURVEBALL alone is a −90% ruin), and a variance/Sharpe objective
+**misprices** them — risk-parity hands BARBELL ~30% because it's low-vol and anti-correlated,
+tightening drawdown to −6% but dragging CAGR from ~7.7% to ~4.7%. **Convexity must be
+budgeted, not optimized in:** free convexity (trend) the book earns; paid convexity
+(long-vol) is a sizing decision, not an optimizer output — the spine's "harvest risk
+structure" thesis, with the tail-hedge caveat made visible.
 
 Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
 *(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
