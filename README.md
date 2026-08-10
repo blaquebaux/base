@@ -59,8 +59,10 @@ white paper is the map:
 
 Ten durable laws came out of it — e.g. *convexity is free (trend) or paid (long-vol), never both cheap
 and fast*; *timing the tail removes the tail*; *correlation is priced instantly — a risk tool, not
-alpha*; *aggression multiplies edge, and with none it multiplies only ruin*. Every result is a
-reproducible sketch in [`scripts/research/`](scripts/research/) (11 scripts), consolidated in
+alpha*; *aggression multiplies edge, and with none it multiplies only ruin*; *you can't short
+momentum-driven strength (it's ruin) — and being long it survives on drift, not selection: winner-picking
+is beta, the tradeable residue is trend convexity*. Every result is a reproducible sketch in
+[`scripts/research/`](scripts/research/) (12 scripts), consolidated in
 [`docs/research_thread_summary.pdf`](docs/research_thread_summary.pdf).
 
 **That most of the scorecard is red is the point** — a strategy is only as trustworthy as the ideas it was willing to kill.
@@ -152,7 +154,7 @@ docs/
   CANONICAL_ARCHITECTURE.md architecture & decisions
   research_thread_summary.pdf  consolidated convexity/correlation/leverage findings
   leverage_decision.html    interactive leverage trade-off visual
-scripts/research/          11 reproducible research sketches (the scorecard's evidence)
+scripts/research/          12 reproducible research sketches (the scorecard's evidence)
 test/                    gate + (quarantined legacy) suites
 ```
 
