@@ -201,7 +201,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
 | **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | scaffold |
 | **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
-| **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | scaffold |
+| **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
 | **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | scaffold |
 | **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
