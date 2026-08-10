@@ -215,7 +215,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
 | **blaquebaux-apac** | Asia-Pacific | scaffold |
 | **blaquebaux-latam** | Latin America | scaffold |
-| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | scaffold |
+| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | scaffold |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | scaffold |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
