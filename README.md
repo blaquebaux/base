@@ -207,7 +207,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bulk** | defense / military & adjacent | scaffold |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | scaffold |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
-| **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | scaffold |
+| **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) |
 | **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
