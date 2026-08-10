@@ -198,7 +198,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built |
 | **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built |
-| **blaquebaux-brash** | aggressive: crypto, alternatives | scaffold |
+| **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | scaffold |
 | **blaquebaux-bottom** | sub-small-cap / penny names | scaffold |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
