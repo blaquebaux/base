@@ -201,7 +201,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | scaffold |
-| **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
+| **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
