@@ -211,7 +211,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
-| **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | scaffold |
+| **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) |
 | **blaquebaux-emea** | Europe, the Middle East & Africa | scaffold |
 | **blaquebaux-apac** | Asia-Pacific | scaffold |
 | **blaquebaux-latam** | Latin America | scaffold |
