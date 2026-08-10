@@ -204,7 +204,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | scaffold |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) |
-| **blaquebaux-bulk** | defense / military & adjacent | scaffold |
+| **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | scaffold |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
 | **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) |
