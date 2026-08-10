@@ -205,8 +205,8 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
-| **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | scaffold |
-| **blaquebaux-blue** | entertainment/film, green energy, tech | scaffold |
+| **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) |
+| **blaquebaux-blue** | entertainment/film, green energy, tech | research done (Brown/Blue rotation keeper) |
 | **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) |
 | **blaquebaux-bubble** | the AI complex viewed as one | scaffold |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
