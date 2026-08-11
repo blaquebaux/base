@@ -255,7 +255,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built — **validation PASS** |
 | **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS** |
-| **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — validation MIXED (stays dry-run) |
+| **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real crypto rail (+0.72 aggressive), needs crypto order support |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — validation MIXED (stays dry-run) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
@@ -272,7 +272,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-emea** | Europe, the Middle East & Africa | research done (null — US beta wearing a flag, 11 ETFs → 1.8 bets; FX drag; no rotation edge) |
 | **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) + **live driver built** — **validation PASS** |
 | **blaquebaux-latam** | Latin America | research done (null — US/commodity beta, worst tail −55%, unhedgeable in-wrapper FX, rotation hurts) |
-| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) + **live driver built** — validation MIXED (stays dry-run) |
+| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real BTC/ETH rail (+0.72), needs crypto order support |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
