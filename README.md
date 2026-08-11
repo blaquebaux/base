@@ -130,6 +130,16 @@ risk structure" thesis with the tail-hedge and regime-timing caveats made visibl
 > production validation gate and the live path** — a separate research lineage that showed no
 > edge over the simpler drawdown brake, not code that was removed.
 
+The keeper book has a **governed dry-run/paper driver** — [`scripts/keeper_book_live.jl`](scripts/keeper_book_live.jl)
+(wrapper [`run_keeper_book_daily.sh`](scripts/run_keeper_book_daily.sh), launchd
+[`com.blaquebaux.keeper_book.plist`](scripts/launchd/com.blaquebaux.keeper_book.plist)). It rebuilds the
+book daily (risk-parity over the 8 ingredients), expands each sleeve into its current instrument weights,
+nets them per symbol, and routes the targets through the **same Layer-3 safety gate + governed execution
+controller** as the spine (`preflight → execute_rebalance! → reconcile`). It defaults to **dry-run**
+(computes the book, runs the gate, logs the netted targets — places nothing) and graduates to Alpaca
+paper only with its own isolated keys/ledger. It is *not* validated to the spine's bar — a paper-path
+graduation of the research, not a live-money endorsement.
+
 Two companion analyses build on the same keeper set (via the shared `keeper_ingredients.jl`
 builder). [`negentropy_ranking.jl`](scripts/research/negentropy_ranking.jl) asks — in Schrödinger's
 negentropy language — *what* the optimizer pays for: not standalone Sharpe (it avoids it, −0.43) and

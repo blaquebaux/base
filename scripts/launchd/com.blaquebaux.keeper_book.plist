@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Diversified KEEPER BOOK (spine + CRACK/BORE/TREND, risk-parity). DRY-RUN by default: computes the
+     book, runs the safety gate, and LOGS the netted targets — places nothing — using the shared
+     read-only data keys. Graduates to PAPER only once ~/.config/blaquebaux/alpaca_keeper.env exists with
+     that account's own keys + BB_KEEPER_MODE=paper (then the wrapper's trading-day gate + catch-up guard
+     apply). Pre-open 09:24 + morning catch-ups; time-only, so the wrapper handles weekends/idempotency.
+     To activate: cp this to ~/Library/LaunchAgents/ and `launchctl load` it. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blaquebaux.keeper_book</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_keeper_book_daily.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>24</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>34</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>49</integer></dict>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>4</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_keeper.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_keeper.err</string>
+</dict>
+</plist>
