@@ -33,6 +33,7 @@ include(joinpath(REPO, "src/module_1_data/alpaca_panel.jl"))
 include(joinpath(REPO, "src/module_8_governance/safety_gate.jl"))
 using .ExecutionLayer, .FeedbackLayer, .PortfolioOptModule, .EquityPanel, .AlpacaPanel, .SafetyGate
 include(joinpath(REPO, "scripts/live_execution.jl"))
+include(joinpath(REPO, "scripts/research/keeper_sleeves.jl"))   # shared sleeve math (single source of truth)
 
 const SPINE_AC     = ["SPY", "IEF", "GLD", "DBC", "DBA"]                 # asset-class ingredients (held)
 const TREND_ASSETS = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA"]
@@ -41,70 +42,22 @@ const BORE_NAMES   = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","JPM","V
 const DATA_UNIVERSE = unique(vcat(SPINE_AC, TREND_ASSETS, ["CRAK", "USO"], BORE_NAMES))  # USO = CRACK signal only
 const LIVE_SENTINEL = "I_UNDERSTAND_THIS_IS_REAL_MONEY"
 
-# ---- sleeve math (mirrors scripts/research/keeper_ingredients.jl) ----------
-function ewma_vol(R, hl)
-    lam = 0.5^(1/hl); T, N = size(R); o = zeros(T, N); v = R[1, :].^2
-    for t in 1:T
-        v = t == 1 ? R[t, :].^2 : lam .* v .+ (1 - lam) .* R[t, :].^2
-        o[t, :] = sqrt.(max.(v, 1e-16))
-    end
-    o
-end
-crack_series(uso, crak) = (T = length(uso); c = zeros(T); for t in 1:T-1; c[t+1] = (uso[t] > 0 ? 1.0 : 0.0) * crak[t+1]; end; c)
-function trend_series(B)
-    T, N = size(B); sv = ewma_vol(B, 32); hz = (63, 126, 252); tr = fill(NaN, T)
-    for t in 253:T-1
-        s = zeros(N); for h in hz; s .+= sign.(vec(prod(1 .+ B[t-h+1:t, :], dims=1)) .- 1); end
-        s ./= length(hz); raw = s ./ (sv[t, :] .* sqrt(252) .+ 1e-12); g = sum(abs.(raw))
-        tr[t+1] = dot(g > 0 ? raw ./ g : zeros(N), B[t+1, :])
-    end
-    tr
-end
-function trend_w_today(B)                                  # gross-1 signed weights at the last bar
-    T, N = size(B); sv = ewma_vol(B, 32); hz = (63, 126, 252); t = T
-    s = zeros(N); for h in hz; s .+= sign.(vec(prod(1 .+ B[t-h+1:t, :], dims=1)) .- 1); end
-    s ./= length(hz); raw = s ./ (sv[t, :] .* sqrt(252) .+ 1e-12); g = sum(abs.(raw)); g > 0 ? raw ./ g : zeros(N)
-end
-function bore_series(B, spy)                                # demo monthly-rebalance long-short, beta-hedged
-    T, N = size(B); k = max(1, round(Int, N * 0.2)); mom = fill(NaN, T, N)
-    for t in 253:T; mom[t, :] = vec(prod(1 .+ B[t-252:t-21, :], dims=1)) .- 1; end
-    cut = fill(NaN, T); w = zeros(N)
-    for t in 253:T-1
-        if (t - 253) % 21 == 0; o = sortperm(mom[t, :]); w = zeros(N); w[o[end-k+1:end]] .= 1/k; w .-= 1/N; end
-        cut[t+1] = dot(w, B[t+1, :])
-    end
-    bore = fill(NaN, T)
-    for t in 314:T
-        y = cut[t-59:t]; x = spy[t-59:t]; m = .!isnan.(y)
-        if sum(m) > 20 && var(x[m]) > 0; bore[t] = cut[t] - (cov(y[m], x[m]) / var(x[m])) * spy[t]; end
-    end
-    bore, cut
-end
-function bore_w_today(B, spy, cut)                          # fresh long-short weights (sum 0) + SPY beta hedge
-    T, N = size(B); k = max(1, round(Int, N * 0.2)); t = T
-    mom = vec(prod(1 .+ B[t-252:t-21, :], dims=1)) .- 1
-    o = sortperm(mom); w = zeros(N); w[o[end-k+1:end]] .= 1/k; w .-= 1/N
-    y = cut[max(1, t-59):t]; x = spy[max(1, t-59):t]; m = .!isnan.(y)
-    beta = (sum(m) > 20 && var(x[m]) > 0) ? cov(y[m], x[m]) / var(x[m]) : 0.0
-    w, beta
-end
-
-# ---- build the netted keeper book ------------------------------------------
+# ---- build the netted keeper book (sleeve math from keeper_sleeves.jl) ------
 function keeper_book(panel, capital)
-    syms = panel.symbols; R = panel.returns
+    syms = panel.symbols; R = panel.returns; Tr = size(R, 1)
     price = Dict(syms[i] => panel.prices[i] for i in eachindex(syms))
     col(s) = R[:, findfirst(==(s), syms)]
     ac    = [col(s) for s in SPINE_AC]
-    cser  = crack_series(col("USO"), col("CRAK"))
-    Btr   = hcat([col(s) for s in TREND_ASSETS]...); tser = trend_series(Btr)
-    Bbo   = hcat([col(s) for s in BORE_NAMES]...);   bser, cut = bore_series(Bbo, col("SPY"))
+    cser  = compute_crack(col("USO"), col("CRAK"), Tr)
+    Btr   = hcat([col(s) for s in TREND_ASSETS]...); tser = compute_trend(Btr, Tr)
+    Bbo   = hcat([col(s) for s in BORE_NAMES]...);   bser = compute_bore(Bbo, col("SPY"), Tr)
     Rp = hcat(ac..., cser, bser, tser)                                   # T x 8 : AC(5), CRACK, BORE, TREND
     valid = findall(t -> all(isfinite, Rp[t, :]), 1:size(Rp, 1))
     b = risk_parity(cov(Rp[valid, :]))                                   # 8 book weights (risk parity)
     bAC, bC, bB, bT = b[1:5], b[6], b[7], b[8]
 
-    tw = trend_w_today(Btr); wbo, beta = bore_w_today(Bbo, col("SPY"), cut)
-    csig = col("USO")[end] > 0 ? 1.0 : 0.0
+    tw = trend_weights_today(Btr); wbo, beta = bore_weights_today(Bbo, col("SPY"))
+    csig = crack_signal(col("USO"))
     net = Dict{String,Float64}(); add!(s, x) = (net[s] = get(net, s, 0.0) + x)
     for (i, s) in enumerate(SPINE_AC);     add!(s, bAC[i]); end           # asset classes held directly
     add!("CRAK", bC * csig)                                               # CRACK: conditional long CRAK
