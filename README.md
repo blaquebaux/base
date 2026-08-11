@@ -255,24 +255,24 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built |
 | **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built |
-| **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) |
-| **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) |
+| **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** |
+| **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
-| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | research done (Brown/Blue rotation keeper) + **live driver built** |
-| **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) |
+| **blaquebaux-beyond** | short-horizon growth (CAGR over weeks, not years) | research done (growth-momentum keeper) + **live driver built** |
 | **blaquebaux-bubble** | the AI complex viewed as one | research done (crowded factor; bubble not fadeable) |
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
-| **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) |
+| **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) + **live driver built** |
 | **blaquebaux-emea** | Europe, the Middle East & Africa | research done (null — US beta wearing a flag, 11 ETFs → 1.8 bets; FX drag; no rotation edge) |
-| **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) |
+| **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) + **live driver built** |
 | **blaquebaux-latam** | Latin America | research done (null — US/commodity beta, worst tail −55%, unhedgeable in-wrapper FX, rotation hurts) |
-| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) |
+| **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) + **live driver built** |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
