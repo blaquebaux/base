@@ -100,16 +100,19 @@ python scripts/dashboard.py                        # dashboard UI on :8050
 
 A worked cross-family demo — [`scripts/research/multi_sleeve_portfolio.jl`](scripts/research/multi_sleeve_portfolio.jl) —
 runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over the **full
-keeper set**: the five asset-class spine plus nine reconstructed keepers — crude→refiner
+keeper set**: the five asset-class spine plus ten reconstructed keepers — crude→refiner
 (CRACK), beta-hedged market-neutral (BORE), vol-scaled multi-horizon trend (TREND),
-brown/blue camp rotation (CAMPROT), drawdown-bounce (DDBOUNCE), the live drawdown-regime
-brake (REGIME), the **actual Gamma-ARMA crisis detector wired in** (GAMMA_REG — module 4
-ARMA+GARCH tail-index/vol + module 5 `detect_crisis_regime`), and two *paid-convexity* tail
-hedges, the Taleb barbell (BARBELL) and vol-gated curveball (CURVEBALL). It surfaces **three**
-honest lessons. First, the return-earning keepers push the diversified book past the best
-single sleeve, and the risk budget flows to the genuinely uncorrelated fragments (TREND corr
-−0.14, BORE −0.06), not the high-Sharpe *beta* sleeves — high standalone Sharpe doesn't earn
-weight, low correlation does. Second, the two regime timers differ sharply: the live drawdown
+brown/blue camp rotation (CAMPROT), drawdown-bounce (DDBOUNCE), Block's four-block cross-asset
+trend (BLOCK), the live drawdown-regime brake (REGIME), the **actual Gamma-ARMA crisis detector
+wired in** (GAMMA_REG — module 4 ARMA+GARCH tail-index/vol + module 5 `detect_crisis_regime`),
+and two *paid-convexity* tail hedges, the Taleb barbell (BARBELL) and vol-gated curveball
+(CURVEBALL). It surfaces **three** honest lessons. First, the return-earning keepers push the
+diversified book past the best single sleeve, and the risk budget flows to the genuinely
+uncorrelated fragments (TREND corr −0.14, BORE −0.06), not the high-Sharpe *beta* sleeves —
+high standalone Sharpe doesn't earn weight, low correlation does; and folding in BLOCK shows the
+converse — it's 0.84-correlated to TREND, so the optimizer just splits the trend budget between
+them and the book lifts only +1.60→+1.66 (the FX/dollar block, Block's one new axis) — redundant
+sleeves don't earn new weight either. Second, the two regime timers differ sharply: the live drawdown
 brake catches slow drawdowns but whipsaws, while the wired-in Gamma-ARMA detector flags only
 ~2% of days yet catches ~67% of the COVID crash and is the *best single ingredient* (+1.13,
 COVID −8% vs SPY −33%) — it **times** the tail cheaply; but it's 0.88-correlated to SPY (so
