@@ -244,7 +244,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
-| **blaquebaux-block** | a basket of derivative strategies | scaffold |
+| **blaquebaux-block** | a basket of derivative strategies | research done (the 4 blocks interlock but stay ~4.6/8 diversified; linkages real yet regime-dependent & priced-in — a risk map, diversification is the edge) |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
