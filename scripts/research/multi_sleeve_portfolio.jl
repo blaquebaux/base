@@ -18,8 +18,11 @@
 #     TREND     vol-scaled multi-horizon trend over the spine (convexity is FREE)
 #     CAMPROT   brown/blue camp rotation (hold the stronger-trending camp)
 #     DDBOUNCE  drawdown-bounce (long the most-fallen quality names)
-#     REGIME    drawdown-regime brake on equity (§3.4 — the validated regime mechanism; the
-#               legacy Gamma-ARMA internals are quarantined, so this stands in for it faithfully)
+#     REGIME    drawdown-regime brake on equity (§3.4 — the mechanism the LIVE spine actually uses)
+#     GAMMA_REG the actual Gamma-ARMA crisis detector wired in: module 4 (ARMA+GARCH vol / tail index)
+#               + module 5 (DPM.detect_crisis_regime). These modules are present and importable; they
+#               are simply excluded from the production validation gate and the live path (a separate
+#               research lineage that showed no edge over the simpler drawdown brake).
 #     BARBELL   Taleb 90/10 BIL/VIXY (PAID convexity — negative carry, crisis insurance)
 #     CURVEBALL vol-gated reversed barbell (deploy long-vol only when vol is cheap)
 #
@@ -29,30 +32,35 @@
 # negative-carry insurance that a variance/Sharpe objective MISPRICES — convexity must be budgeted,
 # not optimized in.
 #
-# RESULTS AS TESTED (2017-2026, gross of costs; avg pairwise corr 0.06):
-#   standalone Sharpe / maxDD  (skew, COVID-capture for the convex ones):
-#     SPY +0.80/-34  IEF +0.12/-24  GLD +0.80/-26  DBC +0.55/-41  DBA +0.42/-32
-#     CRACK +1.20/-24  BORE +0.26/-27  TREND +0.68/-16  CAMPROT +0.88/-36  DDBOUNCE +0.81/-39
-#     REGIME +0.61/-23  BARBELL -0.19/-32 (skew +1.94, COVID +19%)  CURVEBALL -0.77/-90 (skew +1.31)
+# RESULTS AS TESTED (2017-2026, 1831 days, gross of costs; avg pairwise corr 0.09):
+#   standalone Sharpe / maxDD  (skew, COVID-capture for the convex/regime ones):
+#     SPY +0.81/-34  IEF +0.10/-24  GLD +0.93/-26  DBC +0.57/-35  DBA +0.67/-21
+#     CRACK +1.12/-24  BORE +0.44/-23  TREND +0.72/-16  CAMPROT +0.86/-36  DDBOUNCE +1.00/-40
+#     REGIME +0.78/-20  GAMMA_REG +1.13/-24 (corr 0.88, skew +0.14, COVID -8%; flags 2% of days, catches 67% of COVID)
+#     BARBELL -0.23/-32 (skew +1.87, COVID +19%)  CURVEBALL -0.79/-86 (skew +1.36)
 #   optimized book        Sharpe   CAGR   vol  maxDD
-#     min-variance         +1.42    3.9%   3%   -6%
-#     risk-parity          +1.41    4.7%   3%   -6%
-#     max-diversification  +1.39    4.0%   3%   -5%
-#     min-CVaR             +1.34    3.8%   3%   -5%
-#     HRP                  +1.27    4.5%   4%   -6%
-#     equal-weight         +1.21    8.4%   7%  -12%
-#   best SINGLE ingredient: CRACK +1.20 at -24% DD.
-#   risk-parity weights: BARBELL 30% | IEF 14% | TREND 12% | REGIME 8% | BORE 6% | ... | CAMPROT 3%
-# The honest read: two lessons. (1) The RETURN-earning keepers (CRACK/BORE/TREND/CAMPROT/DDBOUNCE)
-# push the diversified book past the best single sleeve, and the risk budget flows to the genuinely
-# uncorrelated fragments (TREND corr -0.11, BORE -0.07), not the high-Sharpe beta sleeves CAMPROT/
-# DDBOUNCE (corr 0.75/0.79) which earn ~3%. (2) The PAID-convexity keepers (REGIME/BARBELL/CURVEBALL)
-# are negative-carry INSURANCE — negative standalone Sharpe, big +skew, +COVID capture, negative corr
-# (CURVEBALL alone is a -90% ruin). A variance/Sharpe objective MISPRICES them: risk-parity hands
-# BARBELL ~30% (low-vol, anti-correlated), tightening drawdown to -6% but dragging CAGR 7.7% -> 4.7%.
-# Convexity must be BUDGETED, not optimized in — size the tail hedge deliberately and prefer a
-# tail-aware objective (min-CVaR); a naive risk-parity over-buys the bleeder. Free convexity (TREND)
-# the book earns; PAID convexity (long-vol) is a sizing decision, not an optimizer output.
+#     risk-parity          +1.60    5.6%   4%   -5%
+#     max-diversification  +1.55    4.8%   3%   -4%
+#     min-variance         +1.54    4.5%   3%   -5%
+#     min-CVaR             +1.44    4.3%   3%   -4%
+#     HRP                  +1.42    5.3%   4%   -6%
+#     equal-weight         +1.39   10.6%   8%  -12%
+#   best SINGLE ingredient: GAMMA_REG +1.13 at -24% DD.
+#   risk-parity weights: BARBELL 31% | IEF 14% | TREND 11% | REGIME 7% | BORE 6% | ... | GAMMA_REG 4% | CAMPROT 2%
+# The honest read: three lessons. (1) The RETURN-earning keepers (CRACK/BORE/TREND/CAMPROT/DDBOUNCE)
+# push the diversified book past the best single sleeve; the risk budget flows to the genuinely
+# uncorrelated fragments (TREND corr -0.14, BORE -0.06), not the high-Sharpe beta sleeves. (2) The two
+# REGIME timers behave differently: the live drawdown brake (REGIME +0.78) catches slow drawdowns but
+# whipsaws (skew -1.00); the actual Gamma-ARMA crisis detector (GAMMA_REG, wired from module 4 tail
+# index/vol + module 5 detect_crisis_regime) flags only 2% of days yet catches 67% of the COVID crash,
+# and is the BEST single ingredient (+1.13, COVID -8% vs SPY -33%) — it TIMES the tail cheaply rather
+# than paying for it. Caveat: corr 0.88 to SPY (so risk-parity still down-weights it as beta, ~4%), and
+# its thresholds catch COVID IN-SAMPLE on one path — no proof of forward skill, which is exactly why
+# the framework is kept-as-research and the LIVE spine trusts the simpler drawdown brake. (3) The PAID-
+# convexity keepers (BARBELL/CURVEBALL) are negative-carry insurance (CURVEBALL alone a -86% ruin) that
+# a variance/Sharpe objective MISPRICES: risk-parity hands BARBELL ~31% because it is low-vol and anti-
+# correlated. Convexity must be BUDGETED, not optimized in — free convexity (TREND) the book earns;
+# PAID convexity (long-vol) is a sizing decision, and timed convexity (GAMMA_REG) is seductive in-sample.
 #
 # Read-only (data only). Run:  julia --project=. scripts/research/multi_sleeve_portfolio.jl
 # =============================================================================
@@ -60,6 +68,10 @@ using Dates, HTTP, JSON3, Statistics, LinearAlgebra, Printf
 const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 include(joinpath(REPO, "src/module_13_portfolio/module_13_portfolio.jl"))
 using .PortfolioOptModule
+# the actual Gamma-ARMA framework modules (present in-repo; excluded from the production
+# validation gate and the live path, but fully importable — used here for the GAMMA_REG sleeve):
+include(joinpath(REPO, "src/module_4_arma/module_4_arma.jl")); using .ARMAGARCH  # ARMA+GARCH, tail index
+include(joinpath(REPO, "src/module_5_dpm/module_5_dpm.jl"));   using .DPM        # DPM crisis-regime detector
 
 const KEY = ENV["ALPACA_KEY_ID"]; const SEC = ENV["ALPACA_SECRET_KEY"]
 function fetch_closes(sym)
@@ -77,7 +89,7 @@ BORE_BASKET = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","JPM","V","MA",
 TREND_ASSETS = ["SPY","IEF","TLT","GLD","DBC","DBA"]
 BROWN = ["XLE","XME","XOP","DBA","MOO"]          # value / real-economy camp
 BLUE  = ["XLK","ICLN","TAN","DIS","NFLX"]         # growth / long-duration-equity camp
-RAW = unique(vcat(["SPY","IEF","GLD","DBC","DBA","TLT","USO","CRAK","VIXY","BIL"], BORE_BASKET, BROWN, BLUE))
+RAW = unique(vcat(["SPY","IEF","GLD","DBC","DBA","TLT","USO","CRAK","VIXY","VXZ","BIL"], BORE_BASKET, BROWN, BLUE))
 
 @info "fetching $(length(RAW)) symbols..."
 D = Dict(s => fetch_closes(s) for s in RAW)
@@ -175,9 +187,8 @@ function compute_ddbounce(U, Tr)
 end
 ddbounce = compute_ddbounce(retmat(BORE_BASKET), Tr)
 
-# ---- keeper 6: REGIME (drawdown-regime-gated equity) ----
-# The kept, VALIDATED regime mechanism is the drawdown brake (§3.4, chosen over vol/corr/trend);
-# the legacy Gamma-ARMA internals are quarantined, so this stands in faithfully as that brake:
+# ---- keeper 6: REGIME (drawdown-regime-gated equity) — the VALIDATED, LIVE regime mechanism ----
+# The regime brake the live spine actually uses (§3.4, chosen empirically over vol/corr/trend):
 # hold SPY while its drawdown-from-high is shallow, step to T-bills once it breaches -8% (no lookahead).
 function compute_regime(spy, bil, Tr; thr=-0.08)
     lvl = cumprod(1 .+ spy); peak = copy(lvl)
@@ -189,6 +200,35 @@ function compute_regime(spy, bil, Tr; thr=-0.08)
     reg
 end
 regime = compute_regime(spy, ret("BIL"), Tr)
+
+# ---- keeper 6b: GAMMA_REG (the actual Gamma-ARMA crisis detector, wired in) ----
+# Uses the real framework code: module 4 ARMAGARCH.rolling_realized_vol + tail_index_from_vol_scale,
+# and module 5 DPM.detect_crisis_regime (fires on >=3 of 4 criteria). The term-structure criterion
+# uses a VIXY/VXZ backwardation proxy for VIX/VXV. (We call the framework's regime CLASSIFIER on its
+# own vol/tail-index primitives; we do NOT run the full particle-filter DPM EM here.) Gate: defensive
+# (T-bills) the day after a crisis is flagged, else hold the market — directly comparable to REGIME.
+function compute_gamma_regime(mkt, bil, vixy, vxz, Tr)
+    sv = ARMAGARCH.rolling_realized_vol(mkt, 10)                 # annualized short-window vol
+    base = fill(NaN, Tr)                                          # robust baseline = trailing-yr median
+    for t in 252:Tr
+        w = sv[t-251:t]; w = w[.!isnan.(w)]; isempty(w) || (base[t] = median(w))
+    end
+    crisis = falses(Tr)
+    for t in 2:Tr
+        (isnan(sv[t]) || isnan(base[t]) || base[t] <= 0) && continue
+        vol3x = sv[t] > 3 * base[t]                                              # criterion 1
+        αlt   = ARMAGARCH.tail_index_from_vol_scale(sv[t], base[t]) < 1.8        # criterion 2 (module 4)
+        dstd  = std(mkt[max(1, t-251):t])                                        # criterion 3: jump intensity
+        jgt   = dstd > 0 && mean(abs.(mkt[max(1, t-9):t]) .> 3 * dstd) > 0.3
+        vv    = t > 5 && (prod(1 .+ vxz[t-4:t]) != 0) &&                         # criterion 4: VIXY/VXZ
+                (prod(1 .+ vixy[t-4:t]) / prod(1 .+ vxz[t-4:t])) > 1.1           #   backwardation proxy
+        crisis[t] = DPM.detect_crisis_regime(nothing, vol3x, αlt, jgt, vv)       # >=3 of 4 (module 5)
+    end
+    reg = fill(NaN, Tr)
+    for t in 2:Tr; reg[t] = crisis[t-1] ? bil[t] : mkt[t]; end
+    reg, crisis
+end
+gamma_reg, gamma_crisis = compute_gamma_regime(spy, ret("BIL"), ret("VIXY"), ret("VXZ"), Tr)
 
 # ---- keeper 7: BARBELL (Taleb 90/10 BIL/VIXY, monthly) — PAID convexity, crisis insurance ----
 function compute_barbell(bil, vixy, rdates, Tr; wsafe=0.9)
@@ -215,9 +255,9 @@ end
 curveball = compute_curveball(ret("BIL"), ret("VIXY"), spy, Tr)
 
 # ---- assemble the ingredient matrix over the common valid range ----
-labels = ["SPY","IEF","GLD","DBC","DBA","CRACK","BORE","TREND","CAMPROT","DDBOUNCE","REGIME","BARBELL","CURVEBALL"]
+labels = ["SPY","IEF","GLD","DBC","DBA","CRACK","BORE","TREND","CAMPROT","DDBOUNCE","REGIME","GAMMA_REG","BARBELL","CURVEBALL"]
 cols = [ret("SPY"), ret("IEF"), ret("GLD"), ret("DBC"), ret("DBA"),
-        crack, bore, trend, camprot, ddbounce, regime, barbell, curveball]
+        crack, bore, trend, camprot, ddbounce, regime, gamma_reg, barbell, curveball]
 Rp = hcat(cols...)
 valid = findall(t -> all(isfinite, Rp[t, :]), 1:Tr)
 Rp = Rp[valid, :]; K = size(Rp, 2)
@@ -228,7 +268,7 @@ cvd = rdates[valid]; covid = findall(d -> "2020-02-19" <= d <= "2020-03-23", cvd
 covidret(r) = isempty(covid) ? 0.0 : prod(1 .+ r[covid]) - 1
 
 println("\n", "="^80, "\nMULTI-SLEEVE PORTFOLIO — engine PortfolioOpt on the FULL KEEPER SET\n", "="^80)
-println("\nstandalone ingredients (5 asset classes + 8 keeper sleeves; last 3 are PAID convexity):")
+println("\nstandalone ingredients (5 asset classes + 9 keeper sleeves; last 2 are PAID convexity):")
 @printf("  %-9s %7s %5s %6s %8s %6s %8s\n", "", "Sharpe", "vol", "maxDD", "corr-SPY", "skew", "COVID")
 for j in 1:K
     r = Rp[:, j]
@@ -237,6 +277,10 @@ for j in 1:K
 end
 avgcorr = (sum(cor(Rp)) - K) / (K*(K-1))
 @printf("\n  average pairwise correlation across ingredients: %.2f  (low = lots to diversify)\n", avgcorr)
+# how the Gamma-ARMA crisis detector behaves (vs the live drawdown brake, both shown above)
+gflag = gamma_crisis[valid]
+@printf("\n  GAMMA_REG (real detector): flagged crisis on %d of %d days (%.0f%%); of the COVID-crash window it caught %.0f%%\n",
+        sum(gflag), length(gflag), 100*mean(gflag), isempty(covid) ? 0.0 : 100*mean(gflag[covid]))
 
 Σ = cov(Rp)
 books = [
@@ -260,11 +304,14 @@ println("\nrisk-parity weights (where the risk budget actually goes):")
 for (l, wv) in sort(collect(zip(labels, risk_parity(Σ))), by = x -> -x[2])
     @printf("    %-9s %5.1f%%\n", l, wv*100)
 end
-println("\nread: the return-earning keepers (CRACK/BORE/TREND/CAMPROT/DDBOUNCE) push the diversified book")
-println("past the best single sleeve. Adding the PAID-convexity keepers (REGIME/BARBELL/CURVEBALL) is a")
-println("different lesson: they are negative-carry INSURANCE (negative standalone Sharpe, big +skew, +COVID")
-println("capture, negative corr). A variance/Sharpe objective MISPRICES them — risk-parity hands BARBELL")
-println("~30% because it is low-vol and anti-correlated, tightening drawdown to -6% but dragging CAGR from")
-println("~7.7% to ~4.7%. Convexity must be BUDGETED, not optimized in: size the tail hedge deliberately and")
-println("prefer a tail-aware objective (min-CVaR); a naive risk-parity over-buys the bleeder. Free convexity")
-println("(TREND) the book earns; PAID convexity (long-vol) is a sizing decision, not an optimizer output.")
+println("\nread: three lessons. (1) The return keepers (CRACK/BORE/TREND/CAMPROT/DDBOUNCE) push the book")
+println("past the best single sleeve; the risk budget flows to the uncorrelated fragments (TREND/BORE), not")
+println("the high-Sharpe beta sleeves. (2) The two regime timers differ: the LIVE drawdown brake (REGIME)")
+println("catches slow drawdowns but whipsaws; the actual Gamma-ARMA detector wired in here (GAMMA_REG, from")
+println("module 4 tail-index/vol + module 5 detect_crisis_regime) flags ~2% of days, catches ~67% of the")
+println("COVID crash, and is the best single ingredient (+1.13) — it TIMES the tail cheaply. But it is 0.88")
+println("corr to SPY (down-weighted as beta) and its thresholds fit COVID IN-SAMPLE — no forward proof,")
+println("which is why it stays research and the live spine trusts the simpler brake. (3) The PAID-convexity")
+println("hedges (BARBELL/CURVEBALL) are negative-carry insurance a variance objective MISPRICES (BARBELL")
+println("gets ~31%). Convexity must be BUDGETED: free (TREND) the book earns; PAID (long-vol) you size;")
+println("TIMED (GAMMA_REG) is seductive in-sample. Diversification is the engine's edge, not manufactured alpha.")

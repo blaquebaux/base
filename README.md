@@ -100,22 +100,32 @@ python scripts/dashboard.py                        # dashboard UI on :8050
 
 A worked cross-family demo — [`scripts/research/multi_sleeve_portfolio.jl`](scripts/research/multi_sleeve_portfolio.jl) —
 runs risk-parity / min-variance / max-diversification / HRP / min-CVaR over the **full
-keeper set**: the five asset-class spine plus eight reconstructed keepers — crude→refiner
+keeper set**: the five asset-class spine plus nine reconstructed keepers — crude→refiner
 (CRACK), beta-hedged market-neutral (BORE), vol-scaled multi-horizon trend (TREND),
-brown/blue camp rotation (CAMPROT), drawdown-bounce (DDBOUNCE), the drawdown-regime brake
-(REGIME), and two *paid-convexity* tail hedges, the Taleb barbell (BARBELL) and the
-vol-gated curveball (CURVEBALL). It surfaces **two** honest lessons. First, the
-return-earning keepers push the diversified book past the best single (lucky) sleeve, and
-the risk budget flows to the genuinely uncorrelated fragments (TREND corr −0.11, BORE
-−0.07), not the high-Sharpe *beta* sleeves (CAMPROT/DDBOUNCE, corr 0.75/0.79, earn ~3%) —
-high standalone Sharpe doesn't earn weight, low correlation does. Second, the paid-convexity
-keepers are negative-carry **insurance** (negative standalone Sharpe, big positive skew,
-positive COVID capture; CURVEBALL alone is a −90% ruin), and a variance/Sharpe objective
-**misprices** them — risk-parity hands BARBELL ~30% because it's low-vol and anti-correlated,
-tightening drawdown to −6% but dragging CAGR from ~7.7% to ~4.7%. **Convexity must be
-budgeted, not optimized in:** free convexity (trend) the book earns; paid convexity
-(long-vol) is a sizing decision, not an optimizer output — the spine's "harvest risk
-structure" thesis, with the tail-hedge caveat made visible.
+brown/blue camp rotation (CAMPROT), drawdown-bounce (DDBOUNCE), the live drawdown-regime
+brake (REGIME), the **actual Gamma-ARMA crisis detector wired in** (GAMMA_REG — module 4
+ARMA+GARCH tail-index/vol + module 5 `detect_crisis_regime`), and two *paid-convexity* tail
+hedges, the Taleb barbell (BARBELL) and vol-gated curveball (CURVEBALL). It surfaces **three**
+honest lessons. First, the return-earning keepers push the diversified book past the best
+single sleeve, and the risk budget flows to the genuinely uncorrelated fragments (TREND corr
+−0.14, BORE −0.06), not the high-Sharpe *beta* sleeves — high standalone Sharpe doesn't earn
+weight, low correlation does. Second, the two regime timers differ sharply: the live drawdown
+brake catches slow drawdowns but whipsaws, while the wired-in Gamma-ARMA detector flags only
+~2% of days yet catches ~67% of the COVID crash and is the *best single ingredient* (+1.13,
+COVID −8% vs SPY −33%) — it **times** the tail cheaply; but it's 0.88-correlated to SPY (so
+still down-weighted as beta) and its thresholds fit COVID *in-sample*, which is exactly why the
+framework stays research and the live spine trusts the simpler brake. Third, the paid-convexity
+hedges are negative-carry **insurance** (CURVEBALL alone a −86% ruin) that a variance objective
+**misprices** — risk-parity hands BARBELL ~31% because it's low-vol and anti-correlated.
+**Convexity must be budgeted, not optimized in:** free convexity (trend) the book earns, paid
+(long-vol) you size, timed (the crisis detector) is seductive in-sample — the spine's "harvest
+risk structure" thesis with the tail-hedge and regime-timing caveats made visible.
+
+> On the Gamma-ARMA framework: modules 1–6 (ARMA+GARCH, the Gamma-hyperprior DPM regime model,
+> `detect_crisis_regime`) are present in-repo and importable, and unit-tested under
+> [`test/runtests.jl`](test/runtests.jl). "Quarantined" means only that they sit **outside the
+> production validation gate and the live path** — a separate research lineage that showed no
+> edge over the simpler drawdown brake, not code that was removed.
 
 Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
 *(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
@@ -175,7 +185,9 @@ test/                    gate + (quarantined legacy) suites
   reconciliation) against a real broker paper account.
 - The strategy is validated out-of-sample; the live path is verified on paper.
 - Real capital has **not** been deployed. The legacy Gamma-ARMA base modules (a separate research
-  lineage) are quarantined from the test gate; see `test/runtests.jl`.
+  lineage — modules 1–6) remain in-repo and unit-tested under `test/runtests.jl`, but sit **outside
+  the production validation gate and the live path**; the live spine uses the simpler drawdown regime
+  brake (§3.4). "Quarantined" means gate/live exclusion, not removal.
 
 ## Roadmap & archived work
 
