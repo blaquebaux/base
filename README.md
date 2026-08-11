@@ -62,7 +62,7 @@ and fast*; *timing the tail removes the tail*; *correlation is priced instantly 
 alpha*; *aggression multiplies edge, and with none it multiplies only ruin*; *you can't short
 momentum-driven strength (it's ruin) — and being long it survives on drift, not selection: winner-picking
 is beta, the tradeable residue is trend convexity*. Every result is a reproducible sketch in
-[`scripts/research/`](scripts/research/) (14 scripts), consolidated in
+[`scripts/research/`](scripts/research/) (17 scripts), consolidated in
 [`docs/research_thread_summary.pdf`](docs/research_thread_summary.pdf).
 
 **That most of the scorecard is red is the point** — a strategy is only as trustworthy as the ideas it was willing to kill.
@@ -188,7 +188,7 @@ docs/
   CANONICAL_ARCHITECTURE.md architecture & decisions
   research_thread_summary.pdf  consolidated convexity/correlation/leverage findings
   leverage_decision.html    interactive leverage trade-off visual
-scripts/research/          14 reproducible research sketches (the scorecard's evidence);
+scripts/research/          17 reproducible research sketches (the scorecard's evidence);
                            keeper_ingredients.jl is the shared keeper-set builder they reuse
 test/                    gate + (quarantined legacy) suites
 ```
