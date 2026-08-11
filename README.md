@@ -137,8 +137,16 @@ book daily (risk-parity over the 8 ingredients), expands each sleeve into its cu
 nets them per symbol, and routes the targets through the **same Layer-3 safety gate + governed execution
 controller** as the spine (`preflight → execute_rebalance! → reconcile`). It defaults to **dry-run**
 (computes the book, runs the gate, logs the netted targets — places nothing) and graduates to Alpaca
-paper only with its own isolated keys/ledger. It is *not* validated to the spine's bar — a paper-path
-graduation of the research, not a live-money endorsement.
+paper only with its own isolated keys/ledger.
+
+Before graduating it, [`scripts/keeper_book_validation.jl`](scripts/keeper_book_validation.jl) is the
+**validate-before-live gate**: a fully causal walk-forward that recomputes the book from data strictly
+before each rebalance, nets it to the **instrument level** (so it pays the sleeves' real internal
+turnover), **net of costs**, against a stated pass/fail bar (+ a purged-K-fold cross-check via
+`module_11_cv`). The keeper book **clears it**: OOS net Sharpe **+1.28** (5 bps/side) / CAGR +6.4% /
+maxDD **−6%**, positive in 9 of 10 years — an honest haircut from the demo's +1.66 gross-in-sample, but
+still well ahead of SPY (+0.79 / −34%), with all five checks passing. That is the research earning its
+graduation to the paper path — still *not* validated to the spine's full production bar.
 
 Two companion analyses build on the same keeper set (via the shared `keeper_ingredients.jl`
 builder). [`negentropy_ranking.jl`](scripts/research/negentropy_ranking.jl) asks — in Schrödinger's
