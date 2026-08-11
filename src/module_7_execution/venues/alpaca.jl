@@ -25,14 +25,15 @@ struct AlpacaConfig
     secret::String
     base_url::String
     timeout_sec::Float64
+    crypto::Bool               # crypto mode: fractional qty + gtc + "BTC/USD" symbols (equity path when false)
 end
 function AlpacaConfig(; paper::Bool = true,
                       key_id::AbstractString = get(ENV, "ALPACA_KEY_ID", ""),
                       secret::AbstractString = get(ENV, "ALPACA_SECRET_KEY", ""),
                       base_url::AbstractString = paper ? "https://paper-api.alpaca.markets" :
                                                          "https://api.alpaca.markets",
-                      timeout_sec::Real = 15.0)
-    AlpacaConfig(String(key_id), String(secret), String(base_url), float(timeout_sec))
+                      timeout_sec::Real = 15.0, crypto::Bool = false)
+    AlpacaConfig(String(key_id), String(secret), String(base_url), float(timeout_sec), crypto)
 end
 
 """
@@ -80,18 +81,30 @@ is_connected(v::AlpacaVenue)::Bool = v.connected
 
 function submit!(v::AlpacaVenue, o::VenueOrder)::OrderAck
     _akeys(v) || return OrderAck(:rejected, "", o.client_order_id, "AlpacaVenue: missing API keys")
-    # Controller already rounds to whole shares; reject fractional rather than silently altering size.
-    o.quantity != round(o.quantity) &&
-        return OrderAck(:rejected, "", o.client_order_id,
-                        "AlpacaVenue: whole shares only; got quantity=$(o.quantity)")
-    body = Dict{String,Any}(
-        "symbol"          => o.symbol,
-        "qty"             => string(Int(o.quantity)),
-        "side"            => o.side === :buy ? "buy" : "sell",
-        "type"            => o.order_type === :limit ? "limit" : "market",
-        "time_in_force"   => String(o.tif),
-        "client_order_id" => o.client_order_id,          # broker-side idempotency (REQ-EXEC-002)
-    )
+    if v.cfg.crypto
+        # Crypto: fractional quantities are allowed; TIF must be gtc (crypto has no "day"); "BTC/USD" symbols.
+        body = Dict{String,Any}(
+            "symbol"          => o.symbol,
+            "qty"             => string(round(o.quantity, digits = 8)),
+            "side"            => o.side === :buy ? "buy" : "sell",
+            "type"            => o.order_type === :limit ? "limit" : "market",
+            "time_in_force"   => "gtc",
+            "client_order_id" => o.client_order_id,
+        )
+    else
+        # Equity: controller already rounds to whole shares; reject fractional rather than silently altering size.
+        o.quantity != round(o.quantity) &&
+            return OrderAck(:rejected, "", o.client_order_id,
+                            "AlpacaVenue: whole shares only; got quantity=$(o.quantity)")
+        body = Dict{String,Any}(
+            "symbol"          => o.symbol,
+            "qty"             => string(Int(o.quantity)),
+            "side"            => o.side === :buy ? "buy" : "sell",
+            "type"            => o.order_type === :limit ? "limit" : "market",
+            "time_in_force"   => String(o.tif),
+            "client_order_id" => o.client_order_id,          # broker-side idempotency (REQ-EXEC-002)
+        )
+    end
     o.order_type === :limit && o.limit_price !== nothing && (body["limit_price"] = string(o.limit_price))
     resp = try
         HTTP.post(string(v.cfg.base_url, "/v2/orders");
@@ -150,7 +163,11 @@ function positions(v::AlpacaVenue, account::String)::Dict{String,Float64}
     resp.status == 200 || (@warn "AlpacaVenue positions HTTP $(resp.status)" body=String(resp.body); return d)
     for pos in JSON3.read(resp.body)
         q = tryparse(Float64, string(pos.qty))
-        q === nothing || (d[String(pos.symbol)] = q)     # Alpaca qty is signed (+ long, − short)
+        q === nothing && continue                         # Alpaca qty is signed (+ long, − short)
+        sym = String(pos.symbol)
+        # Crypto positions report "BTCUSD"; normalize to the "BTC/USD" order symbol so reconcile matches.
+        v.cfg.crypto && !occursin('/', sym) && endswith(sym, "USD") && (sym = sym[1:end-3] * "/USD")
+        d[sym] = q
     end
     return d
 end

@@ -169,3 +169,41 @@ function flatten!(ctrl, ledger;
     reconcile!(ctrl)
     return acks
 end
+
+"""
+    execute_rebalance_frac!(ctrl, ledger; targets, prices, signal_id, regime, solve_id,
+                            pool_id="crypto", settle_secs=3, min_notional=1.0, recorder=...)
+
+FRACTIONAL rebalance for crypto (or any fractional-qty venue). Same governed path as
+`execute_rebalance!` — every order still routes through `submit_governed!` (kill switch, lineage,
+per-pool budget/loss, staleness) and is reconciled — but it does NOT round to whole shares: it
+trades the exact fractional delta and uses a NOTIONAL dead-zone (`|delta|·price < min_notional`)
+instead of the whole-share one. Pair with `AlpacaVenue(; crypto=true)` (fractional qty + gtc).
+"""
+function execute_rebalance_frac!(ctrl, ledger;
+                                 targets::AbstractDict,
+                                 prices::AbstractDict = Dict{String,Float64}(),
+                                 signal_id::String, regime::String, solve_id::String,
+                                 pool_id::String = "crypto", settle_secs::Real = 3,
+                                 min_notional::Real = 1.0, recorder = make_recorder(ledger))
+    acks = OrderAck[]
+    for (sym, tgt) in targets
+        cur   = expected_position(ctrl, sym)
+        delta = tgt - cur
+        px    = get(prices, sym, 0.0)
+        abs(delta) * (px > 0 ? px : 1.0) < min_notional && continue      # notional dead-zone (not whole-share)
+        qty   = round(abs(delta), digits = 8)
+        qty <= 0 && continue
+        side  = delta > 0 ? :buy : :sell
+        cid   = "$(pool_id)|$(sym)|$(solve_id)"                           # idempotency: one order per (pool,symbol,solve)
+        o = VenueOrder(; client_order_id = cid, symbol = sym, side = side, quantity = qty,
+                       order_type = :market, tif = :gtc, ref_price = px > 0 ? px : nothing,
+                       pool_id = pool_id, signal_id = signal_id, regime = regime, solve_id = solve_id)
+        ack = submit_governed!(ctrl, o); push!(acks, ack)
+        @info "crypto rebalance order" symbol=sym delta=round(delta, digits=6) qty=qty status=ack.status error=ack.error
+    end
+    settle_secs > 0 && sleep(settle_secs)
+    fills = process_fills!(ctrl; record = recorder)
+    reconciled = reconcile!(ctrl)
+    return (acks = acks, fills = fills, reconciled = reconciled)
+end
