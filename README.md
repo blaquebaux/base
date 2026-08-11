@@ -62,7 +62,7 @@ and fast*; *timing the tail removes the tail*; *correlation is priced instantly 
 alpha*; *aggression multiplies edge, and with none it multiplies only ruin*; *you can't short
 momentum-driven strength (it's ruin) — and being long it survives on drift, not selection: winner-picking
 is beta, the tradeable residue is trend convexity*. Every result is a reproducible sketch in
-[`scripts/research/`](scripts/research/) (12 scripts), consolidated in
+[`scripts/research/`](scripts/research/) (14 scripts), consolidated in
 [`docs/research_thread_summary.pdf`](docs/research_thread_summary.pdf).
 
 **That most of the scorecard is red is the point** — a strategy is only as trustworthy as the ideas it was willing to kill.
@@ -130,6 +130,16 @@ risk structure" thesis with the tail-hedge and regime-timing caveats made visibl
 > production validation gate and the live path** — a separate research lineage that showed no
 > edge over the simpler drawdown brake, not code that was removed.
 
+Two companion analyses build on the same keeper set (via the shared `keeper_ingredients.jl`
+builder). [`negentropy_ranking.jl`](scripts/research/negentropy_ranking.jl) asks — in Schrödinger's
+negentropy language — *what* the optimizer pays for: not standalone Sharpe (it avoids it, −0.43) and
+not fat tails (marginal non-Gaussianity earns nothing), but **inverse volatility** (+0.88), with
+independence only weakly rewarded; a book built to harvest independence + low vol still reproduces the
+engine's risk-controlled character. [`hedge_saturation.jl`](scripts/research/hedge_saturation.jl) draws
+the **convexity-budget curve**: barbell drawdown-protection *saturates* by ~10% weight, after which only
+the negative carry compounds — yet a naive risk-parity assigns the barbell ~29%, deep past the knee. Both
+make the demo's "budget convexity, don't optimize it in" concrete.
+
 Full math for all of the above: [§9 of `docs/FINANCIAL_METHODS.md`](docs/FINANCIAL_METHODS.md).
 *(Crypto note: a Deribit BTC volatility signal is available as a risk **input** via
 `module_1_data/data_feeds_production.jl`; the spine trades ETFs, not crypto assets.)*
@@ -178,7 +188,8 @@ docs/
   CANONICAL_ARCHITECTURE.md architecture & decisions
   research_thread_summary.pdf  consolidated convexity/correlation/leverage findings
   leverage_decision.html    interactive leverage trade-off visual
-scripts/research/          12 reproducible research sketches (the scorecard's evidence)
+scripts/research/          14 reproducible research sketches (the scorecard's evidence);
+                           keeper_ingredients.jl is the shared keeper-set builder they reuse
 test/                    gate + (quarantined legacy) suites
 ```
 
