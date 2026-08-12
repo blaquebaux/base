@@ -126,8 +126,15 @@ The equity book never needed this. These are **hard, pre-trade + continuous** ch
   tail circuit breaker** (per-venue cap, basis, stablecoin, kill switch — all verified to fire), runs the
   safety-gate preflight, and **logs — placing nothing**. Paper/live are blocked in the driver until the
   PerpVenue adapter exists. Margin-health is live-only (no account in dry-run).
-- **Phase 2 — testnet:** OKX demo/paper credentials; real order path, fake money; verify submit/reconcile/unwind
-  + the margin & kill circuit breakers actually fire.
+- **Phase 2 — OKX adapter (BUILT, offline-verified) + testnet (pending your demo keys):**
+  [`src/module_7_execution/venues/okx.jl`](../src/module_7_execution/venues/okx.jl) is the full `OKXVenue <:
+  ExecutionVenue` — signed v5 REST, DEMO by default (`x-simulated-trading: 1`), uniform **coin-unit** interface
+  (converts the perp leg coin↔contracts via `ctVal` internally), `clOrdId` idempotency, spot(`cash`)/perp(`cross`)
+  order mapping, positions/fills/cancel. [`scripts/okx_selftest.jl`](../scripts/okx_selftest.jl) verifies
+  everything that needs no credentials (compile, dispatch, public specs, contract math, signing, fail-safe
+  no-keys paths — all green). **The credential step is yours** (I cannot create accounts or handle keys): create
+  an OKX **demo** account, put demo key/secret/passphrase in `~/.config/blaquebaux/okx_demo.env`, re-run the
+  self-test to exercise the live testnet path (connect → account_info → positions → tiny order → cancel).
 - **Phase 3 — tiny real allocation:** dedicated sub-account, funded at the venue cap only; tail governance live;
   ramp slowly, watch the funding regime.
 
