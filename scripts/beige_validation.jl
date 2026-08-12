@@ -16,10 +16,16 @@
 #     craters airlines, so the sleeve goes long straight into the crash.
 #   * short-only-on-rising (default; never long airlines): OOS Sharpe +0.21, CAGR +2%, maxDD -57%, beta
 #     -0.14 (market-neutral PASS) but 50% folds+ — FAIL on Sharpe (<0.30) and fold-consistency (<60%).
-# On the recent post-COVID regime the edge IS strong (IEX: flip +0.77 PASS, short-only +0.49) — so BEIGE is
-# a REGIME-DEPENDENT near-miss, real in 2021-2025 but not robust across 2016-2019 + the COVID whipsaw. It
-# stays a research-only candidate; do NOT graduate to a driver. Run with BB_FEED=sip BB_ASOF_LAG=7 for the
-# full window; the family-default iex feed only sees the flattering recent window.
+# CORRECTION (scripts/research/beige_regime_epochs.py): the failure is NOT "the pre-COVID era" — 2017-2019
+# short-only was POSITIVE (+0.61). The full-sample drag is TWO specific years, 2016 (-2.47, an oil-bottom
+# whipsaw) and 2020 (COVID); ex-2016 short-only is +0.62 over 2017-2026 and +1.12 in 2023-2026. Both bad
+# years share ONE structural failure — airlines recovering off a crash INDEPENDENT of fuel, so the
+# fuel-momentum signal fights the dominant driver (a recurring vulnerability, e.g. any demand-shock recession).
+# So BEIGE fails the KEEPER/spine :neutral bar (which wants full-sample robustness) but, SHORT-ONLY (the -94%
+# came entirely from the flip's LONG-airline limb in 2020), is a defensible REGIME-CONDITIONAL PAPER sleeve:
+# positive in 4 of 5 epochs, judged against the family's paper-sleeve bar, shipped with the crash-recovery
+# whipsaw as a documented kill-condition. Run BB_FEED=sip BB_ASOF_LAG=7 for the full window; the family-default
+# iex feed only sees ~2020+ (post-COVID) and flatters the result (+0.77).
 #
 # Fully causal walk-forward: reuses beige_target(panel,cap) each rebalance, holds net weights, accrues P&L
 # NET OF COSTS, reports OOS Sharpe/CAGR/maxDD vs SPY + purged 6-fold check + the :neutral bar (Sharpe>=0.30,

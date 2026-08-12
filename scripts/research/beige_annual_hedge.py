@@ -13,12 +13,13 @@
 #     Mar/Jul/Nov and negative in Jun/Sep (the re-hedge / harvest-pressure months). Gating the SPY-hedged
 #     grain-momentum trade to the post-harvest window (Sep-May) more than DOUBLES it (+0.15 -> +0.38 Sharpe) --
 #     confirming the annual-cycle intuition -- but at 27% in-market and +0.38 it stays a NEAR-MISS, below keeper bar.
-# !! GATE UPDATE (scripts/beige_validation.jl): BEIGE was put through the walk-forward OOS gate and DID NOT
-#    CLEAR the :neutral bar on full 2016-2026 history. The +0.50 below is in-sample and was flattered by a
-#    robustness check that DROPPED the 2020/2022 episodes; the causal walk-forward gives +0.21 (short-only) /
-#    +0.00 & -94% maxDD (the flip goes LONG airlines into the 2020 COVID crash). The edge is REAL but
-#    REGIME-DEPENDENT (strong 2021-2025, not robust across 2016-2019 + COVID). Verdict downgraded to
-#    research-only near-miss; NOT graduated to a driver. In-sample scan below retained for the record.
+# !! GATE + EPOCH UPDATE (scripts/beige_validation.jl, scripts/research/beige_regime_epochs.py): BEIGE was
+#    put through the walk-forward OOS gate and did NOT clear the KEEPER/spine :neutral bar on full history.
+#    The +0.50 below is in-sample. BUT the epoch split corrects the "not robust across 2016-2019" read: the
+#    drag is TWO specific years, 2016 (-2.47) and 2020 COVID, not the pre-COVID era — 2017-2019 short-only
+#    was +0.61, ex-2016 it's +0.62 (2017-2026) / +1.12 (2023-2026). The -94% was the FLIP's long-airline limb
+#    in 2020; SHORT-ONLY removes it. Net: fails the keeper bar, but short-only is a defensible REGIME-CONDITIONAL
+#    PAPER candidate (positive in 4/5 epochs) with the crash-recovery whipsaw as a documented kill-condition.
 #  B) BEIGE looked like the strongest of the new ideas IN-SAMPLE. The lag is textbook: oil trailing momentum
 #     predicts airline forward returns NEGATIVELY and the correlation grows monotonically with horizon (126d oil
 #     trend -> airline next-126d -0.29 vs -0.03 at 5d). Shorting airlines (SPY-hedged) when oil has been rising
