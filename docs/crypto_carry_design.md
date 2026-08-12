@@ -119,9 +119,13 @@ The equity book never needed this. These are **hard, pre-trade + continuous** ch
 ## 6. Phased rollout (each phase gated on the previous)
 
 - **Phase 0 — research (DONE):** premium confirmed real, orthogonal, tail-shaped.
-- **Phase 1 — adapter + paper driver (no keys):** `PerpVenue` skeleton + `funding_at` provider + a governed
-  **dry-run** `carry_book_live.jl` that computes the target pairs against **live public funding data**, runs the
-  funding gate + all tail checks, and logs — places nothing. Mirrors the tactical-book driver. *No venue keys.*
+- **Phase 1 — governed dry-run driver (DONE, no keys):** [`scripts/carry_book_live.jl`](../scripts/carry_book_live.jl)
+  (wrapper [`run_carry_book_daily.sh`](../scripts/run_carry_book_daily.sh), launchd
+  [`com.blaquebaux.carry_book.plist`](../scripts/launchd/com.blaquebaux.carry_book.plist)) computes the
+  delta-neutral spot/perp pairs against **live public OKX funding data**, enforces the funding gate + **every
+  tail circuit breaker** (per-venue cap, basis, stablecoin, kill switch — all verified to fire), runs the
+  safety-gate preflight, and **logs — placing nothing**. Paper/live are blocked in the driver until the
+  PerpVenue adapter exists. Margin-health is live-only (no account in dry-run).
 - **Phase 2 — testnet:** OKX demo/paper credentials; real order path, fake money; verify submit/reconcile/unwind
   + the margin & kill circuit breakers actually fire.
 - **Phase 3 — tiny real allocation:** dedicated sub-account, funded at the venue cap only; tail governance live;

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- PHASE 1 crypto funding-CARRY sleeve — DRY-RUN only. Computes the delta-neutral spot/perp carry book from
+     LIVE PUBLIC funding data (OKX, no keys), runs the funding gate + all tail circuit breakers + safety-gate
+     preflight, and LOGS — places nothing, no venue, no capital. Crypto funding is 24/7, so a single daily
+     run is enough to watch the book + tail governance. Paper/live (Phase 2/3) need the PerpVenue adapter and
+     are blocked in the driver. To activate: cp this to ~/Library/LaunchAgents/ and `launchctl load` it. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blaquebaux.carry_book</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/malcolmx/blaquebaux/scripts/run_carry_book_daily.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>28</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_carry.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/malcolmx/blaquebaux/logs/launchd_carry.err</string>
+</dict>
+</plist>
