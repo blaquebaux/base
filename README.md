@@ -24,6 +24,12 @@ reason*; what survives is built, governed, and validated before it is ever calle
 honest research, reproducible evidence, and execution you can trust — is why Carter Warrens leads on
 **strategy and implementation**, not merely uses the tools everyone now has.
 
+### → The capstone white paper — [`docs/whitepaper.html`](docs/whitepaper.html)
+
+*Blaque Baux — An Honest Architecture for Systematic Risk.* The whole of it in one document: the philosophy,
+the engine, the four books that trade, the derivatives layer, the graveyard of rejected ideas, and the ten
+durable laws the failures taught. Start here.
+
 ---
 
 ## What it is
