@@ -4,9 +4,14 @@
 # small + regime-gated + time-boxed + combined). Validated by scripts/tactical_book_validation.jl (combined
 # +0.45 net, beta ~0, uncorrelated to the keeper book, ~+5% overlay uplift at half weight).
 #
-#   data -> for each regime sleeve {cost-push, beige, bulgar}: check its regime + build market-neutral (SPY-
-#   hedged) weights -> apply the THREE RULES -> combine -> net per-symbol signed-share targets ->
+#   data -> for each regime sleeve {cost-push, beige, bulgar, pead}: check its regime + build market-neutral
+#   (SPY-hedged) weights -> apply the THREE RULES -> combine -> net per-symbol signed-share targets ->
 #   [ SAFETY GATE preflight ] -> governed ExecutionController orders -> reconcile.
+#
+# PEAD (4th sleeve) is EVENT-DRIVEN: long the top-third / short the bottom-third earnings surprise among names
+# still in their post-earnings drift window (from the pead_calendar.py cache). It is exempt from the time-box
+# (positions self-limit as the drift window rolls off); its "regime" is simply having active events. Refresh
+# the calendar periodically:  python scripts/pead_calendar.py  (weekly is plenty).
 #
 # THE THREE RULES:
 #   (1) LIMITED SIZE  — each sleeve capped at ALLOC (10%) of the tactical capital.
@@ -33,6 +38,8 @@ include(joinpath(REPO, "src/module_1_data/alpaca_panel.jl"))
 include(joinpath(REPO, "src/module_8_governance/safety_gate.jl"))
 using .ExecutionLayer, .FeedbackLayer, .PortfolioOptModule, .EquityPanel, .AlpacaPanel, .SafetyGate
 include(joinpath(REPO, "scripts/live_execution.jl"))
+include(joinpath(REPO, "scripts/pead_sleeve.jl"))              # PEAD (4th sleeve): earnings-drift, event-driven
+const PEAD_CAL = load_pead_calendar(joinpath(REPO, "scripts", "pead_earnings_calendar.json"))
 
 const LIVE_SENTINEL = "I_UNDERSTAND_THIS_IS_REAL_MONEY"
 const ALLOC       = parse(Float64, get(ENV, "BB_TACTICAL_ALLOC", "0.10"))   # limited size per sleeve
@@ -47,7 +54,7 @@ struct Sleeve; name::String; basket::Vector{String}; signal::Vector{String}; sid
 const SLEEVES = [Sleeve("cost-push", CP_CUST,     CP_SUP,  -1.0, 63),       # short food-mfrs when suppliers strong
                  Sleeve("beige",     BEIGE_AIR,   ["USO"], -1.0, 126),      # short airlines when fuel rising
                  Sleeve("bulgar",    BULGAR_PROC, ["DBA"], +1.0, 63)]       # long processors when ag rising
-const DATA_UNIVERSE = unique(vcat([sl.basket for sl in SLEEVES]..., [sl.signal for sl in SLEEVES]..., "SPY"))
+const DATA_UNIVERSE = unique(vcat([sl.basket for sl in SLEEVES]..., [sl.signal for sl in SLEEVES]..., PEAD_UNIVERSE, "SPY"))
 
 # market-neutral (SPY-hedged) weights for a sleeve, and whether its regime is on. NOT yet scaled by ALLOC.
 function sleeve_weights(sl::Sleeve, panel)
@@ -95,6 +102,12 @@ function build_book(panel, capital, today, st; advance::Bool)
         push!(report, @sprintf("    %-10s %-8s  %s", sl.name, deployed ? "DEPLOY" : "flat", why))
         deployed && for (s, x) in w; net[s] = get(net, s, 0.0) + ALLOC * x; end
     end
+    # PEAD (4th sleeve): event-driven -> deploy at ALLOC when there are active post-earnings drift-window events.
+    # NO time-box (positions self-limit as the drift window rolls off); its "regime" is simply having live events.
+    pw, pon = pead_weights(panel.returns, panel.symbols, PEAD_CAL, today)
+    push!(report, @sprintf("    %-10s %-8s  %s", "pead", pon ? "DEPLOY" : "flat",
+          pon ? "earnings drift-window book ($(count(x -> x[2] > 0, pw)) long / $(count(x -> x[2] < 0 && x[1] != "SPY", pw)) short)" : "no active earnings events in the drift window"))
+    pon && for (s, x) in pw; net[s] = get(net, s, 0.0) + ALLOC * x; end
     targets = Dict{String,Float64}(); pr = Dict{String,Float64}()
     for (s, wt) in net
         haskey(price, s) || continue

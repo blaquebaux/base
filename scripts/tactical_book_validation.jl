@@ -10,15 +10,18 @@
 # is on (each target returns flat otherwise); (3) time-box — after MAXHOLD consecutive deployed rebalances,
 # force stand-down for COOL rebalances (caps the "overstay the regime into the reversal" tail).
 # Sleeves: cost-push (short food-mfrs when suppliers strong), beige (short airlines when fuel rising, short-only),
-# bulgar (long processors when ag rising). Each SPY-beta-hedged -> market-neutral. Reuses the keeper machinery so
-# the keeper book + tactical book share one causal, net-of-cost, date-aligned walk-forward. Read-only (data only).
+# bulgar (long processors when ag rising), pead (earnings-drift: long top-third / short bottom-third surprise,
+# event-driven, no time-box). Each SPY-beta-hedged -> market-neutral. Reuses the keeper machinery so the keeper
+# book + tactical book share one causal, net-of-cost, date-aligned walk-forward. Read-only (data only).
 #
 # RESULT (net 5bp/side, causal, 2017-11..2026-07) — the design WORKS:
-#   standalone: cost-push +0.22 / beige +0.38 / bulgar +0.16 Sharpe, each beta ~0, maxDD 2-5%. COMBINED 30%
-#   tactical book +0.45 Sharpe, beta -0.01, maxDD -6% — the combo BEATS every individual sleeve (diversification
-#   is additive; the sleeves cover each other's regime losses). corr(tactical, keeper) = +0.04 (uncorrelated),
-#   so as an OVERLAY it LIFTS the keeper book: keeper +1.28 -> +1.35 at half-weight (+0.07 / ~5%). Cost-push ALONE
-#   added +0.1% (nothing); the COMBINED book adds ~5%, because it has a real +0.45 own-Sharpe at ~0 correlation.
+#   standalone: cost-push +0.22 / beige +0.38 / bulgar +0.16 / pead +0.11 Sharpe, each beta ~0, maxDD 2-5%.
+#   COMBINED 40% tactical book +0.46 Sharpe, beta -0.01, maxDD -4% — the combo BEATS every individual sleeve
+#   (diversification is additive; the sleeves cover each other's regime losses). corr(tactical, keeper) = +0.05
+#   (uncorrelated), so as an OVERLAY it LIFTS the keeper book: keeper +1.28 -> +1.35 at half-weight (+0.07 / ~5%).
+#   Cost-push ALONE added +0.1% (nothing); the COMBINED book adds ~5%. PEAD qualifies (market-neutral, +0.11,
+#   uncorrelated) but adds only marginally (+0.45 -> +0.46) -- its gift is a shallower combined DD (-6% -> -4%);
+#   the "diversification bounded by own Sharpe" law again.
 #   CONCLUSION: the non-keepers, used as the user prescribed (small + regime-gated + time-boxed + combined), are a
 #   worthwhile uncorrelated overlay on the keeper book. The time-box costs a little Sharpe on these clean-neutral
 #   sleeves (a safety rail for the tail-prone/directional ones); keep it as governance, not a return driver.
@@ -28,6 +31,7 @@ using Statistics, LinearAlgebra, Dates, Printf
 const REPO = normpath(joinpath(@__DIR__, ".."))
 include(joinpath(REPO, "scripts/research/keeper_ingredients.jl"))
 include(joinpath(REPO, "src/module_11_cv/purged_kfold.jl")); using .PurgedKFold
+include(joinpath(REPO, "scripts/pead_sleeve.jl"))              # PEAD (4th sleeve): earnings-drift, event-driven
 
 const SPINE_AC     = ["SPY", "IEF", "GLD", "DBC", "DBA"]
 const TREND_ASSETS = ["SPY", "IEF", "TLT", "GLD", "DBC", "DBA"]
@@ -37,7 +41,8 @@ const CP_SUP  = ["INGR","ADM"]; const CP_CUST = ["KO","PEP","MDLZ","GIS","KHC"]
 const BEIGE_AIR = ["DAL","UAL","AAL","LUV","ALK","JBLU"]
 const BULGAR_PROC = ["INGR","ADM","BG"]
 const DATA_UNIVERSE = unique(vcat(SPINE_AC, TREND_ASSETS, ["CRAK","USO","DBA"], BORE_NAMES,
-                                  CP_SUP, CP_CUST, BEIGE_AIR, BULGAR_PROC))
+                                  CP_SUP, CP_CUST, BEIGE_AIR, BULGAR_PROC, PEAD_UNIVERSE))
+const PEAD_CAL = load_pead_calendar(joinpath(REPO, "scripts", "pead_earnings_calendar.json"))
 const COST = parse(Float64, get(ENV, "BB_COST_BPS", "5")) / 1e4
 const REB, WARMUP = 21, 380
 const ALLOC = 0.10                 # limited space: 10% of the tactical book per sleeve
@@ -88,12 +93,13 @@ bulgar_w(R)   = neutral_sleeve(R, BULGAR_PROC, ["DBA"],      +1.0, 63)     # lon
 const SLEEVES = [("cost-push", costpush_w), ("beige", beige_w), ("bulgar", bulgar_w)]
 
 # ---- dual walk-forward with TACTICAL GOVERNANCE (cap + time-box + cooldown) ----
-oosK = Float64[]; oosT = Float64[]; oosS = Dict(n=>Float64[] for (n,_) in SLEEVES); oosidx = Int[]
+const ALLNAMES = ["cost-push","beige","bulgar","pead"]
+oosK = Float64[]; oosT = Float64[]; oosS = Dict(n=>Float64[] for n in ALLNAMES); oosidx = Int[]
 wpK = Dict{String,Float64}(); wpT = Dict{String,Float64}()
 runlen = Dict(n=>0 for (n,_) in SLEEVES); cooldn = Dict(n=>0 for (n,_) in SLEEVES)   # time-box state per sleeve
 for t0 in WARMUP:REB:(T-1)
     wK = keeper_weights(Rinst[1:t0,:])
-    wT = Dict{String,Float64}(); sleeve_net = Dict(n=>Dict{String,Float64}() for (n,_) in SLEEVES)
+    wT = Dict{String,Float64}(); sleeve_net = Dict(n=>Dict{String,Float64}() for n in ALLNAMES)
     for (n, f) in SLEEVES
         net, on = f(Rinst[1:t0,:])
         deploy = on
@@ -105,6 +111,9 @@ for t0 in WARMUP:REB:(T-1)
             for (s,x) in net; v = ALLOC*x; wT[s] = get(wT,s,0.0)+v; sleeve_net[n][s] = v; end
         end
     end
+    # PEAD (4th sleeve): event-driven -> deploy at ALLOC when active; NO time-box (positions self-limit via drift rolloff)
+    pnet, pon = pead_weights(Rinst[1:t0,:], DATA_UNIVERSE, PEAD_CAL, Date(rdates[t0]))
+    pon && for (s,x) in pnet; v = ALLOC*x; wT[s] = get(wT,s,0.0)+v; sleeve_net["pead"][s] = v; end
     tK = sum(abs(get(wK,s,0.0)-get(wpK,s,0.0)) for s in union(keys(wK),keys(wpK)))
     tT = sum(abs(get(wT,s,0.0)-get(wpT,s,0.0)) for s in union(keys(wT),keys(wpT)); init=0.0)
     for day in (t0+1):min(t0+REB, T)
@@ -112,7 +121,7 @@ for t0 in WARMUP:REB:(T-1)
         rT = sum(get(wT,s,0.0)*Rinst[day,sidx[s]] for s in keys(wT); init=0.0)
         day==t0+1 && (rK -= tK*COST; rT -= tT*COST)
         push!(oosK,rK); push!(oosT,rT); push!(oosidx,day)
-        for (n,_) in SLEEVES
+        for n in ALLNAMES
             sn = sleeve_net[n]; push!(oosS[n], sum(get(sn,s,0.0)*Rinst[day,sidx[s]] for s in keys(sn); init=0.0))
         end
     end
@@ -129,11 +138,11 @@ println("="^80, "\nTACTICAL SLEEVE BOOK — non-keepers, capped+regime-gated+tim
         rdates[oosidx[1]], rdates[oosidx[end]], length(oosT), ALLOC*100, MAXHOLD, MAXHOLD, COOL)
 @printf("\n  %-28s %8s %8s %8s %7s\n", "book", "Sharpe", "CAGR", "maxDD", "beta")
 spyO = [Rinst[i,sidx["SPY"]] for i in oosidx]; bto(x) = var(spyO)>0 ? cov(x,spyO)/var(spyO) : 0.0
-for (n,_) in SLEEVES
+for n in ALLNAMES
     x=oosS[n]; @printf("  %-28s %+8.2f %7.1f%% %7.0f%% %+7.2f\n", "  $n (10%)", S(x), ann_return(x)*100, DD(x)*100, bto(x))
 end
 betaT = bto(oosT)
-@printf("  %-28s %+8.2f %7.1f%% %7.0f%% %+7.2f\n", "COMBINED tactical (30%)", S(oosT), ann_return(oosT)*100, DD(oosT)*100, betaT)
+@printf("  %-28s %+8.2f %7.1f%% %7.0f%% %+7.2f\n", "COMBINED tactical (40%)", S(oosT), ann_return(oosT)*100, DD(oosT)*100, betaT)
 @printf("\n  corr(tactical book, keeper book) = %+.2f\n", cor(oosT, oosK))
 # overlay: keeper + w*tactical
 sK = S(oosK)

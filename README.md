@@ -152,9 +152,14 @@ The **non-keepers** are not discarded — they are governed as **tactical regime
 sleeves (each real and mechanism-grounded, but below the standalone keeper bar) are run the way they are
 *meant* to be used: small, deployed only in their favorable regime, **time-boxed to a quarter or two**, and
 **combined** so no one sleeve carries the book. [`scripts/tactical_book_validation.jl`](scripts/tactical_book_validation.jl)
-is their gate: a causal, net-of-cost walk-forward of the combined book (cost-push / beige / bulgar), which
-comes out **+0.45 net Sharpe, beta ≈ 0, uncorrelated to the keeper book (+0.04)** — so as an *overlay* it
+is their gate: a causal, net-of-cost walk-forward of the combined book (cost-push / beige / bulgar / **pead**),
+which comes out **+0.46 net Sharpe, beta ≈ 0, uncorrelated to the keeper book (+0.05)** — so as an *overlay* it
 **lifts the keeper book +1.28 → +1.35** at half weight (~+5%), where any one of them alone adds nothing. The
+fourth sleeve, **PEAD** (post-earnings drift: long top-third / short bottom-third surprise among names still in
+their drift window), is *event-driven* — fed by an earnings-calendar pipeline
+([`scripts/pead_calendar.py`](scripts/pead_calendar.py) → [`pead_earnings_calendar.json`](scripts/pead_earnings_calendar.json))
+and exempt from the time-box (its positions self-limit as the drift window rolls off); it qualifies
+(market-neutral, +0.11, uncorrelated) but adds only marginally — diversification is bounded by own Sharpe. The
 **governed driver** is [`scripts/tactical_book_live.jl`](scripts/tactical_book_live.jl) (wrapper
 [`run_tactical_book_daily.sh`](scripts/run_tactical_book_daily.sh), launchd
 [`com.blaquebaux.tactical_book.plist`](scripts/launchd/com.blaquebaux.tactical_book.plist)): it checks each
