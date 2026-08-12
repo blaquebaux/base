@@ -148,6 +148,22 @@ maxDD **−6%**, positive in 9 of 10 years — an honest haircut from the demo's
 still well ahead of SPY (+0.79 / −34%), with all five checks passing. That is the research earning its
 graduation to the paper path — still *not* validated to the spine's full production bar.
 
+The **non-keepers** are not discarded — they are governed as **tactical regime sleeves**. Several near-miss
+sleeves (each real and mechanism-grounded, but below the standalone keeper bar) are run the way they are
+*meant* to be used: small, deployed only in their favorable regime, **time-boxed to a quarter or two**, and
+**combined** so no one sleeve carries the book. [`scripts/tactical_book_validation.jl`](scripts/tactical_book_validation.jl)
+is their gate: a causal, net-of-cost walk-forward of the combined book (cost-push / beige / bulgar), which
+comes out **+0.45 net Sharpe, beta ≈ 0, uncorrelated to the keeper book (+0.04)** — so as an *overlay* it
+**lifts the keeper book +1.28 → +1.35** at half weight (~+5%), where any one of them alone adds nothing. The
+**governed driver** is [`scripts/tactical_book_live.jl`](scripts/tactical_book_live.jl) (wrapper
+[`run_tactical_book_daily.sh`](scripts/run_tactical_book_daily.sh), launchd
+[`com.blaquebaux.tactical_book.plist`](scripts/launchd/com.blaquebaux.tactical_book.plist)): it checks each
+sleeve's regime, applies the **three rules** (10% cap / regime gate / a persisted **time-box** clock that
+forces a stand-down + cooldown after a quarter or two of continuous deployment), nets the combined
+market-neutral book, and routes it through the **same safety gate + governed execution** as the spine. It
+defaults to **dry-run** (and dry-run never advances the time-box clock), with its own fully isolated
+keys/ledger/state so it can never touch the spine or keeper accounts.
+
 Two companion analyses build on the same keeper set (via the shared `keeper_ingredients.jl`
 builder). [`negentropy_ranking.jl`](scripts/research/negentropy_ranking.jl) asks — in Schrödinger's
 negentropy language — *what* the optimizer pays for: not standalone Sharpe (it avoids it, −0.43) and
