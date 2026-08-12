@@ -13,7 +13,13 @@
 #     Mar/Jul/Nov and negative in Jun/Sep (the re-hedge / harvest-pressure months). Gating the SPY-hedged
 #     grain-momentum trade to the post-harvest window (Sep-May) more than DOUBLES it (+0.15 -> +0.38 Sharpe) --
 #     confirming the annual-cycle intuition -- but at 27% in-market and +0.38 it stays a NEAR-MISS, below keeper bar.
-#  B) BEIGE is the strongest of the new ideas -- a KEEPER-CANDIDATE. The lag is textbook: oil trailing momentum
+# !! GATE UPDATE (scripts/beige_validation.jl): BEIGE was put through the walk-forward OOS gate and DID NOT
+#    CLEAR the :neutral bar on full 2016-2026 history. The +0.50 below is in-sample and was flattered by a
+#    robustness check that DROPPED the 2020/2022 episodes; the causal walk-forward gives +0.21 (short-only) /
+#    +0.00 & -94% maxDD (the flip goes LONG airlines into the 2020 COVID crash). The edge is REAL but
+#    REGIME-DEPENDENT (strong 2021-2025, not robust across 2016-2019 + COVID). Verdict downgraded to
+#    research-only near-miss; NOT graduated to a driver. In-sample scan below retained for the record.
+#  B) BEIGE looked like the strongest of the new ideas IN-SAMPLE. The lag is textbook: oil trailing momentum
 #     predicts airline forward returns NEGATIVELY and the correlation grows monotonically with horizon (126d oil
 #     trend -> airline next-126d -0.29 vs -0.03 at 5d). Shorting airlines (SPY-hedged) when oil has been rising
 #     earns Sharpe +0.50, beta +0.02, in-market 58%. It is NOT a two-episode artifact: dropping BOTH the 2020
