@@ -18,8 +18,12 @@
 #    The +0.50 below is in-sample. BUT the epoch split corrects the "not robust across 2016-2019" read: the
 #    drag is TWO specific years, 2016 (-2.47) and 2020 COVID, not the pre-COVID era — 2017-2019 short-only
 #    was +0.61, ex-2016 it's +0.62 (2017-2026) / +1.12 (2023-2026). The -94% was the FLIP's long-airline limb
-#    in 2020; SHORT-ONLY removes it. Net: fails the keeper bar, but short-only is a defensible REGIME-CONDITIONAL
-#    PAPER candidate (positive in 4/5 epochs) with the crash-recovery whipsaw as a documented kill-condition.
+#    in 2020; SHORT-ONLY removes it. A crash-recovery kill-condition was then TESTED (don't short airlines that
+#    are ripping) and does NOT rescue it: full-sample it helps folds/DD but not Sharpe (+0.21->+0.18) and GUTS
+#    the recent window (+0.49->-0.04), because the 2021-2022 wins ALSO feature airlines ripping while fuel
+#    spikes — the failure state is ex-ante indistinguishable from the success state. FINAL: Beige is real and
+#    mechanism-sound but an UNHEDGEABLE-TAIL regime bet; fails the keeper bar and can't be tail-guarded without
+#    killing the edge. Does NOT graduate — not even to paper. Documented, not built. (In-sample scan retained.)
 #  B) BEIGE looked like the strongest of the new ideas IN-SAMPLE. The lag is textbook: oil trailing momentum
 #     predicts airline forward returns NEGATIVELY and the correlation grows monotonically with horizon (126d oil
 #     trend -> airline next-126d -0.29 vs -0.03 at 5d). Shorting airlines (SPY-hedged) when oil has been rising

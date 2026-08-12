@@ -21,11 +21,16 @@
 # whipsaw) and 2020 (COVID); ex-2016 short-only is +0.62 over 2017-2026 and +1.12 in 2023-2026. Both bad
 # years share ONE structural failure — airlines recovering off a crash INDEPENDENT of fuel, so the
 # fuel-momentum signal fights the dominant driver (a recurring vulnerability, e.g. any demand-shock recession).
-# So BEIGE fails the KEEPER/spine :neutral bar (which wants full-sample robustness) but, SHORT-ONLY (the -94%
-# came entirely from the flip's LONG-airline limb in 2020), is a defensible REGIME-CONDITIONAL PAPER sleeve:
-# positive in 4 of 5 epochs, judged against the family's paper-sleeve bar, shipped with the crash-recovery
-# whipsaw as a documented kill-condition. Run BB_FEED=sip BB_ASOF_LAG=7 for the full window; the family-default
-# iex feed only sees ~2020+ (post-COVID) and flatters the result (+0.77).
+# KILL-CONDITION TEST (BEIGE_GUARD): a crash-recovery guard was added — stand DOWN when airlines are ripping
+# (63d momentum > UP_THR) despite rising fuel, the 2016/2020 failure state. RESULT: it does NOT rescue Beige.
+# Full-sample it improves fold-consistency (50%->67%) and maxDD (-57%->-41%) but not Sharpe (+0.21->+0.18), and
+# it GUTS the recent window (+0.49 -> -0.04) — because Beige's best period (2021-2022) has airlines ALSO ripping
+# while fuel spikes and the short STILL pays, so the failure state (airlines up + fuel up) is ex-ante
+# INDISTINGUISHABLE from the success state. Any guard that removes the 2016/2020 losses also removes the wins.
+# CONCLUSION: Beige fails the keeper bar AND its recurring shock-recovery tail cannot be cleanly guarded
+# without killing the edge. It does NOT graduate — not even to a paper driver. Real, mechanism-sound, but an
+# unhedgeable-tail regime bet: documented, not built. (Run BB_FEED=sip BB_ASOF_LAG=7 for the full window; the
+# family-default iex feed only sees ~2020+ and flatters the unguarded result to +0.77.)
 #
 # Fully causal walk-forward: reuses beige_target(panel,cap) each rebalance, holds net weights, accrues P&L
 # NET OF COSTS, reports OOS Sharpe/CAGR/maxDD vs SPY + purged 6-fold check + the :neutral bar (Sharpe>=0.30,
@@ -45,15 +50,22 @@ const UNIVERSE = vcat(AIRLINES, FUEL, "SPY")
 const GROSS    = 1.0                                            # airline book scaled to ~1x gross
 const FUEL_LB  = 126                                           # ~ annual hedging horizon (the lag that matters)
 const CONT     = get(ENV, "BEIGE_CONTINUOUS", "0") in ("1", "true", "yes")  # default short-only (the flip's long-airline limb blows up in 2020); =1 to flip
+const GUARD    = get(ENV, "BEIGE_GUARD", "0") in ("1", "true", "yes")       # kill-condition (tested: doesn't rescue — see header); off by default
+const UP_LB    = parse(Int, get(ENV, "BEIGE_UP_LB", "63"))                   # airline-trend lookback (~1 quarter)
+const UP_THR   = parse(Float64, get(ENV, "BEIGE_UP_THR", "0.10"))           # "ripping": >10%/qtr up despite rising fuel -> stand aside
 
 "Netted per-symbol BEIGE weights + targets. Short airlines when fuel is trending up (flip to long when CONT
- and fuel trending down); SPY leg strips the book's rolling market beta so the sleeve is market-neutral."
+ and fuel trending down); SPY leg strips the book's rolling market beta so the sleeve is market-neutral.
+ GUARD stands the book DOWN (flat) when airlines are themselves ripping (63d momentum > UP_THR) despite rising
+ fuel — the 2016/2020 failure state where a demand recovery overwhelms the fuel-squeeze and the short fights the tape."
 function beige_target(panel, cap)
     syms = panel.symbols; R = panel.returns; T = size(R, 1); N = length(AIRLINES)
     col(s) = R[:, findfirst(==(s), syms)]; px(s) = panel.prices[findfirst(==(s), syms)]
     A = hcat([col(s) for s in AIRLINES]...); spy = col("SPY")
-    fl = cumprod(1 .+ col(FUEL))
-    sgn(tt) = tt > FUEL_LB && (fl[tt] / fl[tt-FUEL_LB] - 1) > 0 ? -1.0 : (CONT ? 1.0 : 0.0)  # short if fuel rising
+    fl = cumprod(1 .+ col(FUEL)); al = cumprod(1 .+ vec(sum(A, dims = 2) ./ N))   # airline basket level (for the guard)
+    guard(tt) = GUARD && tt > UP_LB && (al[tt] / al[tt-UP_LB] - 1) > UP_THR        # airlines ripping -> don't short into it
+    base(tt) = tt > FUEL_LB && (fl[tt] / fl[tt-FUEL_LB] - 1) > 0 ? -1.0 : (CONT ? 1.0 : 0.0)  # short if fuel rising
+    sgn(tt) = guard(tt) ? 0.0 : base(tt)                                          # kill-condition -> flat
     s0 = sgn(T)
     w = fill(s0 / N, N)                                         # equal-weight the airline basket, signed
     # causal daily book series (signal recomputed monthly) -> rolling 60d beta for the hedge
