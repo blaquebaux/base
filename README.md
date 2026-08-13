@@ -328,4 +328,4 @@ execution safety are especially welcome.
 
 ## License
 
-[MIT](LICENSE), with a not-financial-advice notice. © 2026 Carter Warrens.
+[MIT](LICENSE), plus a [not-financial-advice notice](DISCLAIMER.md). © 2026 Carter Warrens.
