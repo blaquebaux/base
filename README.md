@@ -326,6 +326,10 @@ You're welcome to study, fork, and build on this. If you deploy real capital, **
 independently** and start on paper. Issues and PRs that improve the math, the tests, or the
 execution safety are especially welcome.
 
+## BLAQUE BAUX
+
+Explore the [production site](https://www.blaquebaux.com/), [interactive LABS](https://www.blaquebaux.com/labs/), and [open research CORPUS](https://www.blaquebaux.com/corpus/).
+
 ## License
 
 [MIT](LICENSE), plus a [not-financial-advice notice](DISCLAIMER.md). © 2026 Carter Warrens.
