@@ -298,7 +298,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
-| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS** |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; also consumes **blaquebaux-bonds' regime signal** for sizing (validated overlay: Sharpe +0.89→+0.91, −13%→−12% DD; muted vs boom since broad self-de-risks) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS** |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
