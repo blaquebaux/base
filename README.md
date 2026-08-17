@@ -323,20 +323,23 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done + **live driver built** — regime overlay + regime-signal emitter; **validation PASS as an overlay** (full-cycle: cuts equity DD **41%** −34%→−20%, keeps 61% of return, 11% vs 18.7% vol; timing ~static 60/40 as research found — the one overlay that *strengthens* on the full cycle). The corr-regime read (72% persistent a quarter out; hedge works only in neg-corr) is published for the family to size against. Paper/dry-run — not a live-money endorsement |
 | **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | **analytical study done** (4 sketches, grounded in Fidelity / Morgan Stanley GIC / Concentrated-Position-Toolkit docs). All Reg D private placements (democratized $1M/QP → $100k/accredited via Cache, still private); two structures — **721** (≥20% *leveraged real estate* → rate risk, K-1s, ~80% index) vs **351** (diversified-contribution, cleaner). No alpha (fund = index − fee); the product **is** the capital-gains deferral, conditional (**+5–22% after-tax hold-to-death** via the step-up, break-even fee ~1.8%). Its niche vs the toolkit (sell+TLH / completion / collar / CRT): a very-low-basis position you can't afford to sell *or* dilute and intend to hold into your estate. A tax/estate vehicle, not a strategy |
 | **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | research done (**diagnostic null** — de-SPAC decay real (−9pp/yr, 60% below the $10 trust) but untradeable: naive short −26%/yr on −89% DD as ASTS +643%/RKLB +429% run it over; broken-subset short buried by 20-100% borrow; sound trust carry needs SPAC-level data — parked. Joins bubble/brute-force) |
-| **blaquebaux-benchmark** | market internals as a risk-regime read (VIX, credit, breadth, Dow Theory, defensives) | research done — a coherent risk **dashboard** but the internals **coincide, they don't lead** (peak cross-corr k=0). The composite gates SPY well net of cost (Sharpe +0.87→**+1.11**, DD −34%→**−16%**) but it's **vol-timing** (strip vol and breadth/credit/DT barely beat B&H). Publishable as a risk-off regime *with that caveat*; internals confirm, don't forecast |
+| **blaquebaux-benchmark** | market internals as a risk-regime read (VIX, credit, breadth, Dow Theory, defensives) | research done + **regime emitter built** — internals **coincide, they don't lead** (peak cross-corr k=0), but the composite gates SPY net of cost (Sharpe +0.87→**+1.11**, DD −34%→**−16%**). **Publishes `market_regime.txt`** (family's 3rd regime signal) labeled honestly as **vol-timing, not breadth alpha** (strip vol and breadth/credit/DT barely beat B&H). Internals confirm, don't forecast |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
 
 ### Cross-sleeve wiring — published regime signals
 
-Some sleeves *feed* others rather than trade alone. Two **published regime signals** now exist, each
+Some sleeves *feed* others rather than trade alone. Three **published regime signals** now exist, each
 matched to the sleeves it actually helps — the discipline is *match the signal to the sleeve*:
 
 - **[bonds](https://github.com/blaquebaux/bonds)** → `bonds_regime.txt` (US **stock-bond correlation**) —
   for net-long **US-equity** sleeves.
 - **[brics](https://github.com/blaquebaux/brics)** → `dollar_regime.txt` (US **dollar trend**, UUP vs
   100d MA) — for **USD/international** sleeves (a rising dollar is an EM headwind).
+- **[benchmark](https://github.com/blaquebaux/benchmark)** → `market_regime.txt` (**market-internals**
+  risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*
+  (it overlaps broad's vol-target and bonds' crash behavior, so consume it knowing what drives it).
 
 **The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
 is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
