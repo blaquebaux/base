@@ -339,9 +339,11 @@ matched to the sleeves it actually helps — the discipline is *match the signal
   100d MA) — for **USD/international** sleeves (a rising dollar is an EM headwind).
 - **[benchmark](https://github.com/blaquebaux/benchmark)** → `market_regime.txt` (**market-internals**
   risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*.
-  Tested and **declined by every consumer so far**: `bore` (market-neutral → wrong signal) and `broad`
-  (redundant with its vol-target). It publishes for anyone, but its vol-timing is already covered by the
-  sleeves that would want it — a signal with **zero earned consumers**, honestly on the record.
+  Its value shrinks monotonically with how much a book already manages its own risk (benchmark #4):
+  **earned by a naive buy-&-hold long book** (SPY +0.87→+1.11 — which is exactly *benchmark's own
+  gated-SPY book*), and **declined by the managed/neutral sleeves** — `broad` (redundant with its
+  trend+vol-target, +0.84→+0.80) and `bore` (market-neutral → wrong signal). So it's earned where
+  nothing else manages the vol, and correctly refused everywhere that already does.
 
 **The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
 is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
