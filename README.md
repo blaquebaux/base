@@ -320,7 +320,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-buffett** | Buffett's strategy in fragments (quality/value/safety/leverage) | concept — thesis + research plan |
 | **blaquebaux-beltway** | Democratic-era darlings (Biden/Obama/Clinton) — do they hold up? | concept — thesis + research plan |
 | **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | concept — thesis + research plan |
-| **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | concept — thesis + research plan |
+| **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done (the stock-bond corr regime swings sign & is **72% persistent a quarter out**; the hedge works only in the neg-corr regime; credit is coincident not leading; duration barely paid; regime-timing adds ~+0.02 over static 60/40 — a risk/overlay read, not alpha) |
 | **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | concept — thesis + research plan |
 | **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | concept — thesis + research plan |
 
