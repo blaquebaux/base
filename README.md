@@ -316,6 +316,13 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
 | **blaquebaux-block** | a basket of derivative strategies | research done (the 4 blocks interlock but stay ~4.6/8 diversified; linkages real yet regime-dependent & priced-in — a risk map, diversification is the edge) |
+| **blaquebaux-burry** | Michael Burry's book, re-examined (the mechanism, not the man) | concept — thesis + research plan |
+| **blaquebaux-buffett** | Buffett's strategy in fragments (quality/value/safety/leverage) | concept — thesis + research plan |
+| **blaquebaux-beltway** | Democratic-era darlings (Biden/Obama/Clinton) — do they hold up? | concept — thesis + research plan |
+| **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | concept — thesis + research plan |
+| **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | concept — thesis + research plan |
+| **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | concept — thesis + research plan |
+| **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | concept — thesis + research plan |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
