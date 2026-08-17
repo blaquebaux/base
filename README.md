@@ -322,7 +322,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | concept — thesis + research plan |
 | **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done (the stock-bond corr regime swings sign & is **72% persistent a quarter out**; the hedge works only in the neg-corr regime; credit is coincident not leading; duration barely paid; regime-timing adds ~+0.02 over static 60/40 — a risk/overlay read, not alpha) |
 | **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | concept — thesis + research plan |
-| **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | concept — thesis + research plan |
+| **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | research done (**diagnostic null** — de-SPAC decay real (−9pp/yr, 60% below the $10 trust) but untradeable: naive short −26%/yr on −89% DD as ASTS +643%/RKLB +429% run it over; broken-subset short buried by 20-100% borrow; sound trust carry needs SPAC-level data — parked. Joins bubble/brute-force) |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
