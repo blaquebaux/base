@@ -299,7 +299,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target |
-| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS** |
+| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS**. **Declined** benchmark's `market_regime` overlay (measured beta −0.07; gating a neutral book hurts, Sharpe +0.42→+0.31) — wrong signal for a market-neutral book, keeps its own beta hedge |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
