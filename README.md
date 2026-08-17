@@ -327,6 +327,26 @@ and steers it at a different market — one platform, many directions:
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
 
+### Cross-sleeve wiring — the bonds regime overlay
+
+The first sleeve to *feed* others rather than trade alone: **[bonds](https://github.com/blaquebaux/bonds)**
+publishes its stock-bond correlation regime (`~/.config/blaquebaux/bonds_regime.txt`), and net-long
+equity sleeves consume it to **de-risk gross when the bond hedge is dead** (positive correlation → no
+diversification cushion). Each consumer is validated independently — the overlay ships on *only* where
+it earns its place — and the results trace a clean, monotonic law:
+
+| consumer | how much it self-manages risk | overlay effect | default |
+|----------|-------------------------------|----------------|---------|
+| **boom** | none (raw momentum) | same Sharpe, **−22% drawdown** | **ON** |
+| **broad** | trend + vol-target | +0.02 Sharpe, −9% drawdown | **ON** |
+| **buffett** | low-vol blend (USMV) | −0.03 Sharpe, −9% drawdown | OFF |
+| **keeper book** | full risk-parity + BORE + TREND | no change (−6% DD either way) | OFF |
+
+**The overlay's value is inverse to how diversified the book already is** — decisive for raw equity,
+redundant for the flagship. Per-sleeve validation (not a blanket switch) is how that gets decided;
+every consumer keeps a graceful fallback (missing/stale signal → full gross) and a `BB_BONDS_OVERLAY`
+toggle.
+
 ## Contributing / using this
 
 You're welcome to study, fork, and build on this. If you deploy real capital, **validate
