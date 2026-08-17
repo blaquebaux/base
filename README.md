@@ -308,9 +308,9 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-basel** | Basel-regulated banks (one regulated factor) | research done (one-factor; macro sleeve) |
 | **blaquebaux-bio** | biotech; idiosyncratic FDA events (the anti-Basel) | research done (systematic null) |
 | **blaquebaux-bounce** | range-bound "kangaroo" market (mean-reversion) | research done (gated reversal keeper) + **live driver built** — validation MIXED (stays dry-run) |
-| **blaquebaux-emea** | Europe, the Middle East & Africa | research done (null — US beta wearing a flag, 11 ETFs → 1.8 bets; FX drag; no rotation edge) |
-| **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) + **live driver built** — **validation PASS** |
-| **blaquebaux-latam** | Latin America | research done (null — US/commodity beta, worst tail −55%, unhedgeable in-wrapper FX, rotation hurts) |
+| **blaquebaux-emea** | Europe, the Middle East & Africa | research done (null — US beta wearing a flag, 11 ETFs → 1.8 bets; FX drag; no rotation edge). **Dollar overlay tested:** only trades return for drawdown (Sharpe flat, 12% DD cut) — does not rescue the null |
+| **blaquebaux-apac** | Asia-Pacific | research done (US beta + severe FX drag, Japan −229%; the one region with a rotation pulse, long-short +0.30) + **live driver built** — **validation PASS**. **Dollar overlay declined:** the live L/S book is dollar-neutral (measured beta −0.01 to UUP) — wrong signal, correctly not consumed |
+| **blaquebaux-latam** | Latin America | research done (null — US/commodity beta, worst tail −55%, unhedgeable in-wrapper FX, rotation hurts). **Dollar overlay tested:** meaningfully de-risks (DD −55%→−40%, 28% cut) at ~flat Sharpe — a better ingredient, still below SPY, not a keeper |
 | **blaquebaux-bitdollar** | crypto / dollar-crypto axis | research done (trend+vol-target keeper; dollar axis rejected) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real BTC/ETH rail (+0.72), **crypto execution now wired** — trades real BTC/ETH (fractional, governed) |
 | **blaquebaux-blurred** | deliberately uncorrelated names, traded as one | research done (null — uncorrelated equities are a +0.17 floor & unstable; diversify across asset classes) |
 | **blaquebaux-backsliders** | broken decliners, 25%+ off high, no path back (short) | research done (short-the-fallen null; the long bounce is the edge) |
@@ -360,6 +360,17 @@ strengthening benefit is **bonds' own overlay** — the direct hedge-vs-cash swi
 **brics** (a USD-EM book, −0.66 beta to the dollar), de-risking the Gulf ×0.5 when the dollar trends up
 **improves** Sharpe (+0.48→+0.51) *and* cuts drawdown 43% (−35%→−20%) on the full cycle — a clean win,
 because it's the *right* signal for that book. The same book correctly *rejects* the bonds overlay.
+The other USD/international sleeves were tested against it too, and the honest results differ by book:
+
+| consumer | dollar overlay effect (full cycle) | outcome |
+|----------|-----------------------------------|---------|
+| **brics** (Gulf) | Sharpe +0.48→**+0.51**, DD **−35%→−20%** | **ON** — earns it |
+| **latam** | ~flat Sharpe, DD **−55%→−40%** (28% cut) | de-risks; a better ingredient, still a null |
+| **emea** | flat Sharpe, DD −40%→−35% (12% cut) | trades return for DD; still a null |
+| **apac** | live L/S book is **dollar-neutral** (beta −0.01) | **declined** — wrong signal for a neutral book |
+
+Same lesson as the bonds side: *the dollar is the right lever to try for a USD-exposed book, but only
+brics clears the bar; the rest are de-risked at best, and apac's neutral live book declines it outright.*
 
 The lesson: **match the signal to the sleeve, validate each pairing on the full cycle, ship on only
 what earns it** — and beware short-window results. Every consumer keeps a graceful fallback
