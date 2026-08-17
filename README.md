@@ -319,7 +319,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-burry** | Michael Burry's book, re-examined (the mechanism, not the man) | research done (**cautionary null** — the style is mostly ~1.0-beta equity (+0.6 corr-to-momentum), buying the hated (3y reversal) nulls out (L/S Sharpe −0.00), shorting froth is regime/ruin (−98% DD, +86% only in 2022), concentration is a ruin machine; residue (gold, Bleed) already in the family. Joins brute-force/backsliders) |
 | **blaquebaux-buffett** | Buffett's strategy in fragments (quality/value/safety/leverage) | research done + **live driver built — validation MIXED (stays dry-run)**. On the full 2016–2026 SIP history the cheap-safe-quality QUAL/USMV/VLUE/MOAT blend is **not genuinely defensive** (DD −35% ≈ SPY −34%, Sharpe +0.82 < +0.89) — marginally lower-vol but market-like, so it does not clear the defensive bar. Bonds overlay OFF (adds nothing). Defensive beta, not alpha; the real moat (cheap float) is un-buyable |
 | **blaquebaux-beltway** | Democratic-era darlings (Biden/Obama/Clinton) — do they hold up? | research done (**emphatic null — inverted**; 2016+ only, Clinton/Obama out of sample) — the party-aligned basket loses under its own party 4/4; DEM darlings −14.8%/yr under D vs +39.8%/yr under R; under Biden clean energy −21%/yr while fossil +26%/yr — macro dominates, and darlings revert (rank persistence −0.95). Joins bubble/burry) |
-| **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | research done + **live driver built** — the keeper (Gulf KSA/UAE/QAT as a low-corr EM **diversifier**); **validation PASS as a diversifier** (corr-SPY 0.56 vs EEM 0.74, vol 15% vs 20.7%, standalone Sharpe +0.46, full-SIP 2016-2026). 'Best of BRICS' (momentum) & the full basket (EM beta) rejected; Russia excluded on the data. A diversifier, not a market-beater; natural overlay is the dollar regime. Paper/dry-run |
+| **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | research done + **live driver built** — the keeper (Gulf KSA/UAE/QAT as a low-corr EM **diversifier**); **validation PASS as a diversifier** (corr-SPY 0.56 vs EEM 0.74, vol 15% vs 20.7%, standalone Sharpe +0.46, full-SIP 2016-2026). 'Best of BRICS' (momentum) & the full basket (EM beta) rejected; Russia excluded on the data. A diversifier, not a market-beater. **Dollar-regime overlay wired, validated & ON** (its *right* macro signal, not the bonds one): de-risk ×0.5 when the dollar trends up → Sharpe +0.48→**+0.51**, maxDD −35%→**−20%**; brics also **publishes** `dollar_regime.txt` for the family. Paper/dry-run |
 | **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done + **live driver built** — regime overlay + regime-signal emitter; **validation PASS as an overlay** (full-cycle: cuts equity DD **41%** −34%→−20%, keeps 61% of return, 11% vs 18.7% vol; timing ~static 60/40 as research found — the one overlay that *strengthens* on the full cycle). The corr-regime read (72% persistent a quarter out; hedge works only in neg-corr) is published for the family to size against. Paper/dry-run — not a live-money endorsement |
 | **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | **analytical study done** (4 sketches, grounded in Fidelity / Morgan Stanley GIC / Concentrated-Position-Toolkit docs). All Reg D private placements (democratized $1M/QP → $100k/accredited via Cache, still private); two structures — **721** (≥20% *leveraged real estate* → rate risk, K-1s, ~80% index) vs **351** (diversified-contribution, cleaner). No alpha (fund = index − fee); the product **is** the capital-gains deferral, conditional (**+5–22% after-tax hold-to-death** via the step-up, break-even fee ~1.8%). Its niche vs the toolkit (sell+TLH / completion / collar / CRT): a very-low-basis position you can't afford to sell *or* dilute and intend to hold into your estate. A tax/estate vehicle, not a strategy |
 | **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | research done (**diagnostic null** — de-SPAC decay real (−9pp/yr, 60% below the $10 trust) but untradeable: naive short −26%/yr on −89% DD as ASTS +643%/RKLB +429% run it over; broken-subset short buried by 20-100% borrow; sound trust carry needs SPAC-level data — parked. Joins bubble/brute-force) |
@@ -327,13 +327,18 @@ and steers it at a different market — one platform, many directions:
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
 
-### Cross-sleeve wiring — the bonds regime overlay
+### Cross-sleeve wiring — published regime signals
 
-The first sleeve to *feed* others rather than trade alone: **[bonds](https://github.com/blaquebaux/bonds)**
-publishes its stock-bond correlation regime (`~/.config/blaquebaux/bonds_regime.txt`), and net-long
-equity sleeves can consume it to **de-risk gross when the bond hedge is dead** (positive correlation →
-no diversification cushion). Each consumer is validated independently on the **full 2016–2026 SIP
-history** — the overlay ships on *only* where it earns its place:
+Some sleeves *feed* others rather than trade alone. Two **published regime signals** now exist, each
+matched to the sleeves it actually helps — the discipline is *match the signal to the sleeve*:
+
+- **[bonds](https://github.com/blaquebaux/bonds)** → `bonds_regime.txt` (US **stock-bond correlation**) —
+  for net-long **US-equity** sleeves.
+- **[brics](https://github.com/blaquebaux/brics)** → `dollar_regime.txt` (US **dollar trend**, UUP vs
+  100d MA) — for **USD/international** sleeves (a rising dollar is an EM headwind).
+
+**The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
+is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
 
 | consumer | overlay effect (full cycle) | default |
 |----------|-----------------------------|---------|
@@ -349,11 +354,16 @@ gaining a −22% drawdown cut — but that was a **2022-window artifact**: boom'
 is the 2020 COVID crash, a *negative*-correlation episode the overlay correctly leaves alone. On the
 full cycle the equity overlay barely helps anywhere; only **broad** keeps it (marginally). The robust,
 strengthening benefit is **bonds' own overlay** — the direct hedge-vs-cash switch — which cuts drawdown
-41% across the 2020 and 2022 crashes. The lesson stands even though the table changed: **validate each
-consumer on the full cycle, ship on only what earns it** — and beware short-window results. Per-sleeve
-validation (not a blanket switch) is how that gets decided;
-every consumer keeps a graceful fallback (missing/stale signal → full gross) and a `BB_BONDS_OVERLAY`
-toggle.
+41% across the 2020 and 2022 crashes.
+
+**The dollar (UUP-trend) overlay** is the counter-example that proves the discipline. Pointed at
+**brics** (a USD-EM book, −0.66 beta to the dollar), de-risking the Gulf ×0.5 when the dollar trends up
+**improves** Sharpe (+0.48→+0.51) *and* cuts drawdown 43% (−35%→−20%) on the full cycle — a clean win,
+because it's the *right* signal for that book. The same book correctly *rejects* the bonds overlay.
+
+The lesson: **match the signal to the sleeve, validate each pairing on the full cycle, ship on only
+what earns it** — and beware short-window results. Every consumer keeps a graceful fallback
+(missing/stale signal → full gross) and a `BB_BONDS_OVERLAY` / `BB_DOLLAR_OVERLAY` toggle.
 
 ## Contributing / using this
 
