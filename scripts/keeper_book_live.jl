@@ -41,9 +41,39 @@ const BORE_NAMES   = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","JPM","V
                       "PG","XOM","JNJ","COST","WMT","LLY","ORCL","CVX"]
 const DATA_UNIVERSE = unique(vcat(SPINE_AC, TREND_ASSETS, ["CRAK", "USO"], BORE_NAMES))  # USO = CRACK signal only
 const LIVE_SENTINEL = "I_UNDERSTAND_THIS_IS_REAL_MONEY"
+# --- bonds regime overlay (consumes blaquebaux/bonds' published regime read) -----------------
+# The keeper book's STATIC equity leg (the spine SPY held directly) leans on the spine's IEF to
+# diversify it — but that diversification is regime-conditional (blaquebaux/bonds #1). When the
+# stock-bond correlation is POSITIVE (hedge dead) we trim ONLY that static SPY leg; TREND's SPY
+# (adaptive/self-hedging) and BORE's SPY hedge are left intact. Default OFF — the book is already
+# risk-parity-diversified (-6% DD); validation decides whether the trim earns its place (BB_BONDS_OVERLAY=1).
+const REGIME_DERISK   = 0.75
+const REGIME_MAXSTALE = Day(7)
+
+function read_bonds_regime(path)
+    isfile(path) || return (; ok = false)
+    d = Dict{String,String}()
+    for ln in eachline(path)
+        s = strip(ln); (isempty(s) || startswith(s, "#")) && continue
+        kv = split(s, "=", limit = 2); length(kv) == 2 && (d[strip(kv[1])] = strip(kv[2]))
+    end
+    ho = get(d, "hedge_on", ""); asof = tryparse(Date, get(d, "asof", ""))
+    (ho in ("0", "1") && asof !== nothing) || return (; ok = false)
+    (; ok = true, hedge_on = ho == "1", corr = tryparse(Float64, get(d, "corr63", "")), asof = asof)
+end
+
+function regime_eq_scale(path; derisk = parse(Float64, get(ENV, "BB_REGIME_DERISK", string(REGIME_DERISK))))
+    get(ENV, "BB_BONDS_OVERLAY", "0") in ("0", "false", "no") && return (1.0, "bonds overlay OFF by default (book already diversified)")
+    r = read_bonds_regime(path)
+    r.ok || return (1.0, "no bonds regime signal -> full equity leg")
+    (Dates.today() - r.asof) > REGIME_MAXSTALE && return (1.0, "bonds regime STALE ($(r.asof)) -> full equity leg")
+    c = r.corr === nothing ? NaN : round(r.corr, digits = 2)
+    r.hedge_on ? (1.0,    "bond hedge LIVE (neg-corr $c) -> full static equity leg") :
+                 (derisk, "bond hedge DEAD (pos-corr $c) -> trim static SPY leg x$derisk")
+end
 
 # ---- build the netted keeper book (sleeve math from keeper_sleeves.jl) ------
-function keeper_book(panel, capital)
+function keeper_book(panel, capital; eq_scale = 1.0)
     syms = panel.symbols; R = panel.returns; Tr = size(R, 1)
     price = Dict(syms[i] => panel.prices[i] for i in eachindex(syms))
     col(s) = R[:, findfirst(==(s), syms)]
@@ -59,7 +89,7 @@ function keeper_book(panel, capital)
     tw = trend_weights_today(Btr); wbo, beta = bore_weights_today(Bbo, col("SPY"))
     csig = crack_signal(col("USO"))
     net = Dict{String,Float64}(); add!(s, x) = (net[s] = get(net, s, 0.0) + x)
-    for (i, s) in enumerate(SPINE_AC);     add!(s, bAC[i]); end           # asset classes held directly
+    for (i, s) in enumerate(SPINE_AC);     add!(s, s == "SPY" ? bAC[i] * eq_scale : bAC[i]); end  # static equity leg trimmed by the bonds-regime overlay
     add!("CRAK", bC * csig)                                               # CRACK: conditional long CRAK
     for (i, s) in enumerate(TREND_ASSETS); add!(s, bT * tw[i]); end       # TREND: signed vol-scaled weights
     for (i, s) in enumerate(BORE_NAMES);   add!(s, bB * wbo[i]); end      # BORE: long/short 20 names
@@ -90,7 +120,9 @@ function main(; capital = parse(Float64, get(ENV, "BB_KEEPER_CAPITAL", "100000")
 
     panel = panel_at(AlpacaPanelProvider(DATA_UNIVERSE; lookback = 500))
     fresh = (Dates.today() - panel.asof) <= Day(5)
-    bk = keeper_book(panel, capital)
+    regime_path = get(ENV, "BB_REGIME_PATH", joinpath(homedir(), ".config", "blaquebaux", "bonds_regime.txt"))
+    eq_scale, rnote = regime_eq_scale(regime_path); @info "bonds regime overlay" note=rnote
+    bk = keeper_book(panel, capital; eq_scale = eq_scale)
     @info "book weights (risk-parity over 8 ingredients)" asof=panel.asof gross=round(bk.gross, digits=2) weights=Dict(["SPY_ac","IEF","GLD","DBC","DBA","CRACK","BORE","TREND"][i] => round(bk.b[i], digits=3) for i in 1:8)
     println("\n  netted per-symbol target weights (of $(round(Int,capital)) capital):")
     for (s, w) in sort(collect(bk.net), by = x -> -abs(x[2]))
