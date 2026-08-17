@@ -293,12 +293,12 @@ and steers it at a different market — one platform, many directions:
 |------|-------|-------|
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built — **validation PASS** |
-| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**; now consumes **blaquebaux-bonds' regime signal** for sizing (de-risks gross when the bond hedge is dead) — validated cross-sleeve overlay: same Sharpe +1.33, −22% drawdown |
+| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**. Can consume **blaquebaux-bonds' regime signal** for sizing, but the overlay is **OFF by default**: full-cycle (2016–2026 SIP) re-validation shows 0% DD cut / −0.05 Sharpe — the earlier −22% DD was a 2022-window (IEX-feed) artifact |
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real crypto rail (+0.72 aggressive), **crypto execution now wired** — trades real BTC/ETH (aggressive, governed) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
-| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; also consumes **blaquebaux-bonds' regime signal** for sizing (validated overlay: Sharpe +0.89→+0.91, −13%→−12% DD; muted vs boom since broad self-de-risks) |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS** |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
@@ -317,10 +317,10 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-brute-force** | names propped up by options/squeeze/flow | research done (fade rejected; needs positioning data) |
 | **blaquebaux-block** | a basket of derivative strategies | research done (the 4 blocks interlock but stay ~4.6/8 diversified; linkages real yet regime-dependent & priced-in — a risk map, diversification is the edge) |
 | **blaquebaux-burry** | Michael Burry's book, re-examined (the mechanism, not the man) | research done (**cautionary null** — the style is mostly ~1.0-beta equity (+0.6 corr-to-momentum), buying the hated (3y reversal) nulls out (L/S Sharpe −0.00), shorting froth is regime/ruin (−98% DD, +86% only in 2022), concentration is a ruin machine; residue (gold, Bleed) already in the family. Joins brute-force/backsliders) |
-| **blaquebaux-buffett** | Buffett's strategy in fragments (quality/value/safety/leverage) | research done + **live driver built** — the honest keeper (cheap-safe-quality QUAL/USMV/VLUE/MOAT blend) as a governed **defensive** sleeve; **validation PASS** (calmer than SPY: vol 14.9% vs 16.6%, DD −23% vs −25%, Sharpe 0.95 vs 0.96). Bonds-regime overlay wired but **OFF by default** — redundant on an already-defensive book (costs ~0.03 Sharpe). Not a market-beater (defensive beta, not alpha); the real moat (cheap float) is un-buyable. Paper/dry-run |
+| **blaquebaux-buffett** | Buffett's strategy in fragments (quality/value/safety/leverage) | research done + **live driver built — validation MIXED (stays dry-run)**. On the full 2016–2026 SIP history the cheap-safe-quality QUAL/USMV/VLUE/MOAT blend is **not genuinely defensive** (DD −35% ≈ SPY −34%, Sharpe +0.82 < +0.89) — marginally lower-vol but market-like, so it does not clear the defensive bar. Bonds overlay OFF (adds nothing). Defensive beta, not alpha; the real moat (cheap float) is un-buyable |
 | **blaquebaux-beltway** | Democratic-era darlings (Biden/Obama/Clinton) — do they hold up? | research done (**emphatic null — inverted**; 2016+ only, Clinton/Obama out of sample) — the party-aligned basket loses under its own party 4/4; DEM darlings −14.8%/yr under D vs +39.8%/yr under R; under Biden clean energy −21%/yr while fossil +26%/yr — macro dominates, and darlings revert (rank persistence −0.95). Joins bubble/burry) |
 | **blaquebaux-brics** | the tradable core of BRICS (best emerging growth engines) | research done + **live driver built** — the keeper (Gulf KSA/UAE/QAT as a low-corr EM **diversifier**); **validation PASS as a diversifier** (corr-SPY 0.56 vs EEM 0.74, vol 15% vs 20.7%, standalone Sharpe +0.46, full-SIP 2016-2026). 'Best of BRICS' (momentum) & the full basket (EM beta) rejected; Russia excluded on the data. A diversifier, not a market-beater; natural overlay is the dollar regime. Paper/dry-run |
-| **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done + **live driver built** — regime overlay + regime-signal emitter; **validation PASS as an overlay** (cuts equity DD 28% −22%→−16%, keeps 59% of return, 10.5% vs 17% vol; timing ~static 60/40 as research found). The corr-regime read (72% persistent a quarter out; hedge works only in neg-corr) is now published for the family to size against. Stays paper/dry-run — not a live-money endorsement |
+| **blaquebaux-bonds** | the bond–equity relationship (macro overlay for sizing/hedging) | research done + **live driver built** — regime overlay + regime-signal emitter; **validation PASS as an overlay** (full-cycle: cuts equity DD **41%** −34%→−20%, keeps 61% of return, 11% vs 18.7% vol; timing ~static 60/40 as research found — the one overlay that *strengthens* on the full cycle). The corr-regime read (72% persistent a quarter out; hedge works only in neg-corr) is published for the family to size against. Paper/dry-run — not a live-money endorsement |
 | **blaquebaux-basket** | exchange / swap funds — hidden private-wealth vehicles | concept — thesis + research plan |
 | **blaquebaux-blank** | SPACs / blank-check shells (trust carry, deSPAC shorts, busts) | research done (**diagnostic null** — de-SPAC decay real (−9pp/yr, 60% below the $10 trust) but untradeable: naive short −26%/yr on −89% DD as ASTS +643%/RKLB +429% run it over; broken-subset short buried by 20-100% borrow; sound trust carry needs SPAC-level data — parked. Joins bubble/brute-force) |
 
@@ -331,19 +331,27 @@ Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's k
 
 The first sleeve to *feed* others rather than trade alone: **[bonds](https://github.com/blaquebaux/bonds)**
 publishes its stock-bond correlation regime (`~/.config/blaquebaux/bonds_regime.txt`), and net-long
-equity sleeves consume it to **de-risk gross when the bond hedge is dead** (positive correlation → no
-diversification cushion). Each consumer is validated independently — the overlay ships on *only* where
-it earns its place — and the results trace a clean, monotonic law:
+equity sleeves can consume it to **de-risk gross when the bond hedge is dead** (positive correlation →
+no diversification cushion). Each consumer is validated independently on the **full 2016–2026 SIP
+history** — the overlay ships on *only* where it earns its place:
 
-| consumer | how much it self-manages risk | overlay effect | default |
-|----------|-------------------------------|----------------|---------|
-| **boom** | none (raw momentum) | same Sharpe, **−22% drawdown** | **ON** |
-| **broad** | trend + vol-target | +0.02 Sharpe, −9% drawdown | **ON** |
-| **buffett** | low-vol blend (USMV) | −0.03 Sharpe, −9% drawdown | OFF |
-| **keeper book** | full risk-parity + BORE + TREND | no change (−6% DD either way) | OFF |
+| consumer | overlay effect (full cycle) | default |
+|----------|-----------------------------|---------|
+| **bonds** (own overlay vs static 60/40) | **−41% drawdown** (−34%→−20%), timing ≈ static | **ON** |
+| **broad** | +0.02 Sharpe, ~flat DD — marginal but consistent | **ON** |
+| **boom** | 0% DD cut, −0.05 Sharpe | OFF |
+| **buffett** | no DD help, −0.04 Sharpe | OFF |
+| **keeper book** | no change (−6% DD either way) | OFF |
 
-**The overlay's value is inverse to how diversified the book already is** — decisive for raw equity,
-redundant for the flagship. Per-sleeve validation (not a blanket switch) is how that gets decided;
+**Honest finding (after a full-cycle re-test):** the equity-sleeve de-risk overlay is *not* the broad
+win it first looked like. An early pass on the engine's default IEX feed (only ~2021+) showed boom
+gaining a −22% drawdown cut — but that was a **2022-window artifact**: boom's worst full-cycle drawdown
+is the 2020 COVID crash, a *negative*-correlation episode the overlay correctly leaves alone. On the
+full cycle the equity overlay barely helps anywhere; only **broad** keeps it (marginally). The robust,
+strengthening benefit is **bonds' own overlay** — the direct hedge-vs-cash switch — which cuts drawdown
+41% across the 2020 and 2022 crashes. The lesson stands even though the table changed: **validate each
+consumer on the full cycle, ship on only what earns it** — and beware short-window results. Per-sleeve
+validation (not a blanket switch) is how that gets decided;
 every consumer keeps a graceful fallback (missing/stale signal → full gross) and a `BB_BONDS_OVERLAY`
 toggle.
 
