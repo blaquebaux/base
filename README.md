@@ -298,7 +298,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
-| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target. **Declined** benchmark's `market_regime` (redundant: gating cuts Sharpe +0.84→+0.80, its vol-target already does the vol-timing) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS**. **Declined** benchmark's `market_regime` overlay (measured beta −0.07; gating a neutral book hurts, Sharpe +0.42→+0.31) — wrong signal for a market-neutral book, keeps its own beta hedge |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
@@ -338,8 +338,10 @@ matched to the sleeves it actually helps — the discipline is *match the signal
 - **[brics](https://github.com/blaquebaux/brics)** → `dollar_regime.txt` (US **dollar trend**, UUP vs
   100d MA) — for **USD/international** sleeves (a rising dollar is an EM headwind).
 - **[benchmark](https://github.com/blaquebaux/benchmark)** → `market_regime.txt` (**market-internals**
-  risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*
-  (it overlaps broad's vol-target and bonds' crash behavior, so consume it knowing what drives it).
+  risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*.
+  Tested and **declined by every consumer so far**: `bore` (market-neutral → wrong signal) and `broad`
+  (redundant with its vol-target). It publishes for anyone, but its vol-timing is already covered by the
+  sleeves that would want it — a signal with **zero earned consumers**, honestly on the record.
 
 **The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
 is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
