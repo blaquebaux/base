@@ -293,7 +293,7 @@ and steers it at a different market — one platform, many directions:
 |------|-------|-------|
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built — **validation PASS** |
-| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS** |
+| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**; now consumes **blaquebaux-bonds' regime signal** for sizing (de-risks gross when the bond hedge is dead) — validated cross-sleeve overlay: same Sharpe +1.33, −22% drawdown |
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real crypto rail (+0.72 aggressive), **crypto execution now wired** — trades real BTC/ETH (aggressive, governed) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
