@@ -326,7 +326,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-benchmark** | market internals as a risk-regime read (VIX, credit, breadth, Dow Theory, defensives) | research done + **regime emitter built** — internals **coincide, they don't lead** (peak cross-corr k=0), but the composite gates SPY net of cost (Sharpe +0.87→**+1.11**, DD −34%→**−16%**). **Publishes `market_regime.txt`** (family's 3rd regime signal) labeled honestly as **vol-timing, not breadth alpha** (strip vol and breadth/credit/DT barely beat B&H). Internals confirm, don't forecast |
 | **blaquebaux-bridgewater** | Bridgewater's All-Weather & Pure Alpha | research done — All-Weather is a real low-vol risk-parity compounder (+0.95 Sharpe, ~⅓ market vol) but **the same book as the spine** (corr **0.96**), and the **spine beats it** (+0.97 vs +0.84) by omitting long-bond TLT — an **external validation of the spine**. Failure mode = the positive stock-bond regime (2022, −19% ≈ SPY) that `bonds` maps; RPAR (the ETF) is a poor implementation. Pure Alpha = documented gap |
 | **blaquebaux-bind** | the rest of the hedge-fund landscape (Millennium, Citadel, pod shops) | research done (**diagnostic null**) — the liquid replicators are watered-down positive-beta (equal-weight book **+3.5%/yr**, not the pods' 10-15%); the only genuinely uncorrelated slices (**DBMF** managed-futures, **BTAL** anti-beta crisis hedge) = the family's **trend + Bleed** already. Real pod-shop edge (leverage × PMs × execution × access) is private/unreplicable. Nothing to add |
-| **blaquebaux-blackstone** | listed private-equity managers (BX/KKR/Apollo/Carlyle/Ares) | research done — the "buy, prop, exit" model is a **levered pro-cyclical market/credit factor**, not diversification: beta-SPY **1.39** / beta-XLF 0.99, **1.8/6 eff-bets**, beta-credit **+1.55**, up/down beta 1.34/1.41 (falls harder), coupled to private-credit BDCs. Huge in the easy-money bull (**+784% vs SPY +337%**) but 31% vol / −45→−57% DD → Sharpe +0.83 < SPY +0.88 (extra return is leverage, not skill). The opposite of a hedge |
+| **blaquebaux-blackstone** | listed private-equity managers (BX/KKR/Apollo/Carlyle/Ares) | research done — the "buy, prop, exit" model is a **levered pro-cyclical market/credit factor**, not diversification: beta-SPY **1.39** / beta-XLF 0.99, **1.8/6 eff-bets**, beta-credit **+1.55**, up/down beta 1.34/1.41 (falls harder), coupled to private-credit BDCs. Huge in the easy-money bull (**+784% vs SPY +337%**) but 31% vol / −45→−57% DD → Sharpe +0.83 < SPY +0.88 (extra return is leverage, not skill), the opposite of a hedge — **so the live driver ships it *governed***: equal-weight PE book + benchmark's `market_regime` overlay **ON** (validation PASS). The **first consumer book to *earn* that overlay** — on this uniquely unmanaged high-beta book it lifts Sharpe **+0.76→+0.95** (above SPY), holds CAGR flat, cuts DD **−45%→−31%** for free |
 | **blaquebaux-benefactors** | foreign creditors — US Treasury holdings by country vs their economies/markets | research done (**honest macro null**) — FRED data (Japan 1984, China 2003) supplied by hand (box can't reach FRED). A creditor's Treasury *buying* has only a weak ~+0.15 coincident link to its own market, swamped by global (SPY) beta, **no clean lead** — for China the *market leads the flow* (+0.18), so causality runs **backward**. Creditor status is a macro read, not a signal. Market test ETF-capped to 2016-2026 |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
@@ -344,10 +344,12 @@ matched to the sleeves it actually helps — the discipline is *match the signal
 - **[benchmark](https://github.com/blaquebaux/benchmark)** → `market_regime.txt` (**market-internals**
   risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*.
   Its value shrinks monotonically with how much a book already manages its own risk (benchmark #4):
-  **earned by a naive buy-&-hold long book** (SPY +0.87→+1.11 — which is exactly *benchmark's own
-  gated-SPY book*), and **declined by the managed/neutral sleeves** — `broad` (redundant with its
-  trend+vol-target, +0.84→+0.80) and `bore` (market-neutral → wrong signal). So it's earned where
-  nothing else manages the vol, and correctly refused everywhere that already does.
+  **earned by naive high-beta books with no risk control** — benchmark's own gated-SPY (SPY +0.87→+1.11)
+  and now **[blackstone](https://github.com/blaquebaux/blackstone)**, the first *consumer* sleeve to earn
+  it (levered listed-PE, Sharpe +0.76→+0.95 / DD −45%→−31% / CAGR flat) — and **declined by the
+  managed/neutral sleeves** — `broad` (redundant with its trend+vol-target, +0.84→+0.80) and `bore`
+  (market-neutral → wrong signal). So it's earned where nothing else manages the vol, and correctly
+  refused everywhere that already does.
 
 **The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
 is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
