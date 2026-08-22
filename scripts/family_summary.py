@@ -36,6 +36,7 @@ LEGS = [
     ("MULTI (single+multi)",   "alpaca_multi.env", os.path.join(REPO, "logs"),                  "spine_multi"),
     ("BLUNT (crude->refiner)", "alpaca_blunt.env", os.path.join(HOME, "blaquebaux-blunt/logs"), "blunt"),
     ("BOOM (megacap mom)",     "alpaca_boom.env",  os.path.join(HOME, "blaquebaux-boom/logs"),  "boom"),
+    ("BOOM+MKT (overlay A/B)", "alpaca_boom_market.env", os.path.join(HOME, "blaquebaux-boom/logs"), "boom_market"),
 ]
 
 
