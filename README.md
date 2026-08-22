@@ -301,6 +301,7 @@ and steers it at a different market — one platform, many directions:
 |------|-------|-------|
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built — **validation PASS** |
+| **blaquebaux-bull** | naive long-growth book (QQQ/VUG/XLK), governed | live driver built — the **naive counterpart to broad** (no trend/vol-target). Raw book is growth beta, a regime bet not alpha (bogle #3); made ownable by **balanced's `rate_regime` overlay, validated ON** — on this *unmanaged* book de-risking when rates rise cuts maxDD **−35%→−30%** (13%), lifts Sharpe **+0.96→+1.04** / M² +1.0%→+2.3%, improves skew −0.15→−0.05, keeps 90%. **The one book in the family that earns the rate overlay on-by-default** (broad, managed, declined it — benchmark #4's law from the earning side) |
 | **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**. **Two regime overlays wired, both OFF by default.** *bonds*: 0% DD cut / −0.05 Sharpe (the earlier −22% DD was a 2022-window IEX artifact). *market_regime* (the **conditional-keeper test**): cuts maxDD **41%** (−19%→−11%), nudges Sharpe +1.22→**+1.26**, lifts M², and **flips skew −0.31→+0.23** (removes the momentum-crash left tail) — but gives back ~20% of return, **failing the retain-80% bar**, because BOOM already vol-targets (self-de-risks, cf. broad/bridgewater). Ships **opt-in** as drawdown/left-tail insurance, not a default keeper |
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real crypto rail (+0.72 aggressive), **crypto execution now wired** — trades real BTC/ETH (aggressive, governed) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
@@ -362,10 +363,11 @@ signal to the sleeve*:
   100d MA) — for **value/growth-sensitive** sleeves (value beats growth +12%/yr when rates rise, −12% when
   they fall; the regime is clean, the coarse rotation itself doesn't beat the index — an ingredient).
   Consumers tested: on *managed* **[broad](https://github.com/blaquebaux/broad)** (QQQ) it lifts Sharpe
-  +0.96→+1.03 / M² +0.8%→+2.0% but cuts 0% off drawdown → **opt-in** (broad self-manages). On a **naive**
-  growth book (buy-&-hold QQQ, balanced #4) the *same* signal **passes the full bar** — DD −35%→−29% (18% cut),
-  Sharpe +0.95→+1.04, keeps 90% — because the naive book has the drawdown gap the managed one already filled.
-  The law holds: a de-risking overlay's value ∝ how unmanaged the book is (and whether its worst DD is rate-driven).
+  +0.96→+1.03 / M² +0.8%→+2.0% but cuts 0% off drawdown → **opt-in** (broad self-manages). On the *naive*
+  growth book **[bull](https://github.com/blaquebaux/bull)** (QQQ/VUG/XLK, no trend/vol-target) the *same*
+  signal **earns ON-by-default** — DD −35%→−30% (13% cut), Sharpe +0.96→+1.04, keeps 90% — because the naive
+  book has the drawdown gap the managed one already filled. The law holds: a de-risking overlay's value ∝
+  how unmanaged the book is (and whether its worst DD is rate-driven). bull is the sleeve built to earn it.
 - **[bogle](https://github.com/blaquebaux/bogle)** → `bogle_hurdle.txt` (the plain-**VOO** bar) + a reusable
   scorer — not a regime but the **yardstick** every sleeve is measured against (clear it net of cost/tax:
   Jensen α > 0 AND M² > 0 vs VOO, or it isn't a keeper).

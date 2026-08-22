@@ -37,6 +37,7 @@ LEGS = [
     ("BLUNT (crude->refiner)", "alpaca_blunt.env", os.path.join(HOME, "blaquebaux-blunt/logs"), "blunt"),
     ("BOOM (megacap mom)",     "alpaca_boom.env",  os.path.join(HOME, "blaquebaux-boom/logs"),  "boom"),
     ("BOOM+MKT (overlay A/B)", "alpaca_boom_market.env", os.path.join(HOME, "blaquebaux-boom/logs"), "boom_market"),
+    ("BULL (naive growth+rate)", "alpaca_bull.env",  os.path.join(HOME, "blaquebaux-bull/logs"),  "bull"),
 ]
 
 
