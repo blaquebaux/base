@@ -361,9 +361,11 @@ signal to the sleeve*:
 - **[balanced](https://github.com/blaquebaux/balanced)** → `rate_regime.txt` (US **rate direction**, IEF vs
   100d MA) — for **value/growth-sensitive** sleeves (value beats growth +12%/yr when rates rise, −12% when
   they fall; the regime is clean, the coarse rotation itself doesn't beat the index — an ingredient).
-  First consumer tested: **[broad](https://github.com/blaquebaux/broad)** (QQQ growth) — de-risking on rising
-  rates lifts Sharpe +0.96→+1.03 & M² +0.8%→+2.0% but cuts 0% off drawdown, so it **fails the DD bar** and
-  ships **opt-in** (broad already self-manages via trend+vol-target — same lesson as its declined market_regime).
+  Consumers tested: on *managed* **[broad](https://github.com/blaquebaux/broad)** (QQQ) it lifts Sharpe
+  +0.96→+1.03 / M² +0.8%→+2.0% but cuts 0% off drawdown → **opt-in** (broad self-manages). On a **naive**
+  growth book (buy-&-hold QQQ, balanced #4) the *same* signal **passes the full bar** — DD −35%→−29% (18% cut),
+  Sharpe +0.95→+1.04, keeps 90% — because the naive book has the drawdown gap the managed one already filled.
+  The law holds: a de-risking overlay's value ∝ how unmanaged the book is (and whether its worst DD is rate-driven).
 - **[bogle](https://github.com/blaquebaux/bogle)** → `bogle_hurdle.txt` (the plain-**VOO** bar) + a reusable
   scorer — not a regime but the **yardstick** every sleeve is measured against (clear it net of cost/tax:
   Jensen α > 0 AND M² > 0 vs VOO, or it isn't a keeper).
