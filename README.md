@@ -409,6 +409,18 @@ The lesson: **match the signal to the sleeve, validate each pairing on the full 
 what earns it** — and beware short-window results. Every consumer keeps a graceful fallback
 (missing/stale signal → full gross) and a `BB_BONDS_OVERLAY` / `BB_DOLLAR_OVERLAY` toggle.
 
+**A deeper law, revealed by the fat-tail toolkit (Jarque-Bera + skew + Jensen's α + M²).** Returns are
+non-normal (JB rejects normality everywhere), so an overlay's real job is the *left tail*, which Sharpe
+can't see. Re-examining the borderline declines under the toolkit shows an overlay only buys genuine tail
+insurance — **flips return skew from negative to positive** — when it de-risks on a **crash-timing** signal:
+`market_regime` (vol-timing) did exactly that for **boom** (skew −0.31→**+0.23**, DD −41%), making it an
+opt-in insurance overlay. Overlays keyed on a **persistent state** — the stock-bond correlation (**bridgewater**,
+~33% of days) or the dollar trend (**latam**, ~63% of days) — de-risk indiscriminately, so they shed return
+and *worsen* skew (bridgewater −0.32→−0.73; latam −0.94→−1.16) instead of catching the tail. And "defensive"
+is itself a tail claim: **buffett**'s blend has a *worse* skew and *negative* Jensen's α / M² vs SPY — not
+defensive at all. So the toolkit doesn't rescue borderline nulls; it **discriminates by mechanism** —
+crash-timed overlays can insure, state-timed ones only shave — and sharpens every honest rejection.
+
 ## Contributing / using this
 
 You're welcome to study, fork, and build on this. If you deploy real capital, **validate
