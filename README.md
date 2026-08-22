@@ -289,6 +289,14 @@ core was held to (§7). No archived component has cleared it yet — and this RE
 This repo is the base/blueprint. Each family repo consumes this engine as a git submodule
 and steers it at a different market — one platform, many directions:
 
+> **Evaluation standard (family-wide).** Returns are fat-tailed, so a bare Sharpe misleads. Every sleeve's
+> research toolkit now **tests normality with Jarque-Bera** before leaning on any mean-variance number, and
+> reports risk-adjusted performance with **Jensen's alpha** (return beyond what beta earns) and **M²**
+> (return re-scaled to the benchmark's own volatility) — not Sharpe alone. Where JB rejects normality (it
+> usually does for daily bars), the **left tail / max-drawdown** carries as much weight as the mean. This is
+> also the honest core of the *conditional-keeper* idea: a book "fine until the crash" is only a keeper if a
+> validated regime gate makes the **gated** version clear the bar on the full sample, black swans *in*.
+
 | Repo | Focus | State |
 |------|-------|-------|
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
@@ -328,6 +336,14 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bind** | the rest of the hedge-fund landscape (Millennium, Citadel, pod shops) | research done (**diagnostic null**) — the liquid replicators are watered-down positive-beta (equal-weight book **+3.5%/yr**, not the pods' 10-15%); the only genuinely uncorrelated slices (**DBMF** managed-futures, **BTAL** anti-beta crisis hedge) = the family's **trend + Bleed** already. Real pod-shop edge (leverage × PMs × execution × access) is private/unreplicable. Nothing to add |
 | **blaquebaux-blackstone** | listed private-equity managers (BX/KKR/Apollo/Carlyle/Ares) | research done — the "buy, prop, exit" model is a **levered pro-cyclical market/credit factor**, not diversification: beta-SPY **1.39** / beta-XLF 0.99, **1.8/6 eff-bets**, beta-credit **+1.55**, up/down beta 1.34/1.41 (falls harder), coupled to private-credit BDCs. Huge in the easy-money bull (**+784% vs SPY +337%**) but 31% vol / −45→−57% DD → Sharpe +0.83 < SPY +0.88 (extra return is leverage, not skill), the opposite of a hedge — **so the live driver ships it *governed***: equal-weight PE book + benchmark's `market_regime` overlay **ON** (validation PASS). The **first consumer book to *earn* that overlay** — on this uniquely unmanaged high-beta book it lifts Sharpe **+0.76→+0.95** (above SPY), holds CAGR flat, cuts DD **−45%→−31%** for free |
 | **blaquebaux-benefactors** | foreign creditors — US Treasury holdings by country vs their economies/markets | research done (**honest macro null**) — FRED data (Japan 1984, China 2003) supplied by hand (box can't reach FRED). A creditor's Treasury *buying* has only a weak ~+0.15 coincident link to its own market, swamped by global (SPY) beta, **no clean lead** — for China the *market leads the flow* (+0.18), so causality runs **backward**. Creditor status is a macro read, not a signal. Market test ETF-capped to 2016-2026 |
+| **blaquebaux-buyouts** | post-buyout targets — pump-and-dump on the exit? | **[Concept]** — the PE *targets* (cf. blackstone = the managers). Private "prop it up" leg is invisible (no ticker); testable surface = sponsor-backed IPOs/re-IPOs (`IPO`/`FPX`) + post-lockup drift → a **short/avoid** thesis on the sponsor exit. Fat-tail toolkit (JB + Jensen's α + M²) |
+| **blaquebaux-bigbrother** | America's new SOEs — US government equity stakes (Intel, CHIPS, bailouts) | **[Concept]** — does a government backstop prop the stock (implicit put) or **drag it like a China SOE** (state ownership destroys value)? Two opposed hypotheses; the tell is the **tail**. Rare hand-curated stake events + an industrial-policy/defense basket vs SPY |
+| **blaquebaux-battered** | distressed assets that survive to pay out (the MF Global playbook) | **[Concept]** — fallen angels (`ANGL`), high-yield; the *right-thesis-killed-by-leverage* lesson. A prime **conditional-keeper** case — the fat left tail is the true cost, so verdicts lean on JB + max-drawdown. OTC distressed invisible; `ANGL`/`HYG` proxies, survivorship flagged |
+| **blaquebaux-bets** | the gambling complex (sports betting, casinos, prediction markets) | **[Concept]** — durable "house always wins" premium, or levered consumer discretionary? Kalshi/Polymarket private (gap); listed books/casinos + `BETZ` testable vs SPY/XLY. Fat-tail toolkit |
+| **blaquebaux-balanced** | value investing / margin of safety — still crucial? | **[Concept]** — the **value factor** isolated (`RPV`/`RPG`), distinct from buffett's blend; likely a **conditional keeper** (value ~ rising rates). "Margin of safety" is a left-tail claim → drawdown + JB alongside Jensen's α / M² |
+| **blaquebaux-bogle** | Vanguard / low-cost indexing | **[Concept]** — a **meta-sleeve**: quantify the low-cost-index **hurdle** every other sleeve must clear, and whether Vanguard's tilts beat plain `VOO`. Near-tautological by design; its output is a calibrated baseline for the family |
+| **blaquebaux-bureaucrats** | congressional trading under the STOCK Act (Pelosi et al.) | **[Concept]** — do lawmakers beat the market, or is it a **mega-cap-tech tilt**? `NANC`/`KRUZ` tracker ETFs priceable from 2023; granular STOCK Act data hand-supplied (egress wall). Distinct from beltway (party-era winners) — this is the legislators' personal book |
+| **blaquebaux-belt-tighteners** | the inflation domino across sectors, globally | **[Concept]** — belt-tightening cascade `XLY→XLP→XLB→XLU→XLRE→XLE`, then contagion when **US + China** sneeze together. A **correlation-tightening** study; inflation via breakevens or hand-loaded CPI; `XLC` only from 2018, global capped ~2016 |
 
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
