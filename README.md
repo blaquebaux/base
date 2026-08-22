@@ -340,8 +340,8 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bigbrother** | America's new SOEs — US government equity stakes (Intel, CHIPS, bailouts) | **[Concept]** — does a government backstop prop the stock (implicit put) or **drag it like a China SOE** (state ownership destroys value)? Two opposed hypotheses; the tell is the **tail**. Rare hand-curated stake events + an industrial-policy/defense basket vs SPY |
 | **blaquebaux-battered** | distressed assets that survive to pay out (the MF Global playbook) | **[Concept]** — fallen angels (`ANGL`), high-yield; the *right-thesis-killed-by-leverage* lesson. A prime **conditional-keeper** case — the fat left tail is the true cost, so verdicts lean on JB + max-drawdown. OTC distressed invisible; `ANGL`/`HYG` proxies, survivorship flagged |
 | **blaquebaux-bets** | the gambling complex (sports betting, casinos, prediction markets) | **[Concept]** — durable "house always wins" premium, or levered consumer discretionary? Kalshi/Polymarket private (gap); listed books/casinos + `BETZ` testable vs SPY/XLY. Fat-tail toolkit |
-| **blaquebaux-balanced** | value investing / margin of safety — still crucial? | research done — **value is a rate-regime bet, and "margin of safety" is mostly a myth at the factor level.** Value **lagged growth** risk-adjusted (RPV α −2.3% / M² −4.9% vs RPG −3.4%; spread −1.9%/yr) — a different beta, not alpha (cf. bogle). It crashed **harder** than growth (pure value maxDD **−51% vs −37%**, worse skew) — the safety folklore inverted; its only real safety is lower downside vol + cushioning growth-specific selloffs. Its one strong, clean signal is **rate-conditional** (value−growth **+12.3%/yr rising rates, −12.3%/yr falling**), but a coarse rate-timed rotation (α +1.8%) **doesn't clear** the SPY hurdle net of cost (M² −0.5%). A conditional-keeper **ingredient**, not a standalone edge |
-| **blaquebaux-bogle** | Vanguard / low-cost indexing | research done (**meta-sleeve — the hurdle**) — the `VOO` line **Sharpe +0.89 / Jensen-α 0 / M² 0** is the bar the family is measured against. Broader diversification *cost* return this US-led decade (VTI α −0.7%, VT α −1.6%); **0/7** Vanguard tilts beat plain VOO risk-adjusted (tilting = different beta, not alpha); only **2/10** popular active/thematic funds cleared it (QQQ/XLK — pure tech-beta, a regime bet), and **ARKK** hid a **−81% DD** behind +13% CAGR. Bogle stands; the toolkit makes it precise. *(Also corrected M² to the Sharpe-difference form → benchmark-vs-itself = 0.)* |
+| **blaquebaux-balanced** | value investing / margin of safety — still crucial? | research done — **value is a rate-regime bet, and "margin of safety" is mostly a myth at the factor level.** Value **lagged growth** risk-adjusted (RPV α −2.3% / M² −4.9% vs RPG −3.4%; spread −1.9%/yr) — a different beta, not alpha (cf. bogle). It crashed **harder** than growth (pure value maxDD **−51% vs −37%**, worse skew) — the safety folklore inverted; its only real safety is lower downside vol + cushioning growth-specific selloffs. Its one strong, clean signal is **rate-conditional** (value−growth **+12.3%/yr rising rates, −12.3%/yr falling**), but a coarse rate-timed rotation (α +1.8%) **doesn't clear** the SPY hurdle net of cost (M² −0.5%). A conditional-keeper **ingredient**, not a standalone edge — **publishes `rate_regime.txt`** (the family's 4th regime signal) for value-sensitive consumers |
+| **blaquebaux-bogle** | Vanguard / low-cost indexing | research done (**meta-sleeve — the hurdle**) — the `VOO` line **Sharpe +0.89 / Jensen-α 0 / M² 0** is the bar the family is measured against. Broader diversification *cost* return this US-led decade (VTI α −0.7%, VT α −1.6%); **0/7** Vanguard tilts beat plain VOO risk-adjusted (tilting = different beta, not alpha); only **2/10** popular active/thematic funds cleared it (QQQ/XLK — pure tech-beta, a regime bet), and **ARKK** hid a **−81% DD** behind +13% CAGR. Bogle stands; the toolkit makes it precise. **Publishes `bogle_hurdle.txt`** (the plain-VOO bar) + a reusable scorer — the family yardstick. *(Also corrected M² to the Sharpe-difference form → benchmark-vs-itself = 0.)* |
 | **blaquebaux-bureaucrats** | congressional trading under the STOCK Act (Pelosi et al.) | **[Concept]** — do lawmakers beat the market, or is it a **mega-cap-tech tilt**? `NANC`/`KRUZ` tracker ETFs priceable from 2023; granular STOCK Act data hand-supplied (egress wall). Distinct from beltway (party-era winners) — this is the legislators' personal book |
 | **blaquebaux-belt-tighteners** | the inflation domino across sectors, globally | **[Concept]** — belt-tightening cascade `XLY→XLP→XLB→XLU→XLRE→XLE`, then contagion when **US + China** sneeze together. A **correlation-tightening** study; inflation via breakevens or hand-loaded CPI; `XLC` only from 2018, global capped ~2016 |
 
@@ -350,13 +350,20 @@ Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's k
 
 ### Cross-sleeve wiring — published regime signals
 
-Some sleeves *feed* others rather than trade alone. Three **published regime signals** now exist, each
-matched to the sleeves it actually helps — the discipline is *match the signal to the sleeve*:
+Some sleeves *feed* others rather than trade alone. **Four published regime signals** now exist (plus
+bogle's benchmark **hurdle**), each matched to the sleeves it actually helps — the discipline is *match the
+signal to the sleeve*:
 
 - **[bonds](https://github.com/blaquebaux/bonds)** → `bonds_regime.txt` (US **stock-bond correlation**) —
   for net-long **US-equity** sleeves.
 - **[brics](https://github.com/blaquebaux/brics)** → `dollar_regime.txt` (US **dollar trend**, UUP vs
   100d MA) — for **USD/international** sleeves (a rising dollar is an EM headwind).
+- **[balanced](https://github.com/blaquebaux/balanced)** → `rate_regime.txt` (US **rate direction**, IEF vs
+  100d MA) — for **value/growth-sensitive** sleeves (value beats growth +12%/yr when rates rise, −12% when
+  they fall; the regime is clean, the coarse rotation itself doesn't beat the index — an ingredient).
+- **[bogle](https://github.com/blaquebaux/bogle)** → `bogle_hurdle.txt` (the plain-**VOO** bar) + a reusable
+  scorer — not a regime but the **yardstick** every sleeve is measured against (clear it net of cost/tax:
+  Jensen α > 0 AND M² > 0 vs VOO, or it isn't a keeper).
 - **[benchmark](https://github.com/blaquebaux/benchmark)** → `market_regime.txt` (**market-internals**
   risk-on/off composite) — a broad de-risking flag, *honestly labeled vol-timing, not breadth alpha*.
   Its value shrinks monotonically with how much a book already manages its own risk (benchmark #4):
