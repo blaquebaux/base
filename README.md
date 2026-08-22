@@ -306,7 +306,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
-| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target. **Declined** benchmark's `market_regime` (redundant: gating cuts Sharpe +0.84→+0.80, its vol-target already does the vol-timing) |
+| **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target. **Declined** benchmark's `market_regime` (redundant: gating cuts Sharpe +0.84→+0.80, its vol-target already does the vol-timing). **Consumes balanced's `rate_regime` opt-in** (rising rates = growth headwind): lifts Sharpe +0.96→+1.03 / M² +0.8%→+2.0% but 0% DD cut → fails the DD bar, ships opt-in (self-manages, same as market_regime) |
 | **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS**. **Declined** benchmark's `market_regime` overlay (measured beta −0.07; gating a neutral book hurts, Sharpe +0.42→+0.31) — wrong signal for a market-neutral book, keeps its own beta hedge |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
@@ -361,6 +361,9 @@ signal to the sleeve*:
 - **[balanced](https://github.com/blaquebaux/balanced)** → `rate_regime.txt` (US **rate direction**, IEF vs
   100d MA) — for **value/growth-sensitive** sleeves (value beats growth +12%/yr when rates rise, −12% when
   they fall; the regime is clean, the coarse rotation itself doesn't beat the index — an ingredient).
+  First consumer tested: **[broad](https://github.com/blaquebaux/broad)** (QQQ growth) — de-risking on rising
+  rates lifts Sharpe +0.96→+1.03 & M² +0.8%→+2.0% but cuts 0% off drawdown, so it **fails the DD bar** and
+  ships **opt-in** (broad already self-manages via trend+vol-target — same lesson as its declined market_regime).
 - **[bogle](https://github.com/blaquebaux/bogle)** → `bogle_hurdle.txt` (the plain-**VOO** bar) + a reusable
   scorer — not a regime but the **yardstick** every sleeve is measured against (clear it net of cost/tax:
   Jensen α > 0 AND M² > 0 vs VOO, or it isn't a keeper).
