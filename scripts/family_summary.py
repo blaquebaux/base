@@ -38,6 +38,7 @@ LEGS = [
     ("BOOM (megacap mom)",     "alpaca_boom.env",  os.path.join(HOME, "blaquebaux-boom/logs"),  "boom"),
     ("BOOM+MKT (overlay A/B)", "alpaca_boom_market.env", os.path.join(HOME, "blaquebaux-boom/logs"), "boom_market"),
     ("BULL (naive growth+rate)", "alpaca_bull.env",  os.path.join(HOME, "blaquebaux-bull/logs"),  "bull"),
+    ("BORE β+α (portable alpha)", "alpaca_bore_pa.env", os.path.join(HOME, "blaquebaux-bore/logs"), "bore_pa"),
 ]
 
 
