@@ -296,6 +296,11 @@ and steers it at a different market — one platform, many directions:
 > usually does for daily bars), the **left tail / max-drawdown** carries as much weight as the mean. This is
 > also the honest core of the *conditional-keeper* idea: a book "fine until the crash" is only a keeper if a
 > validated regime gate makes the **gated** version clear the bar on the full sample, black swans *in*.
+> The toolkit also carries **`portable_alpha(α, β)`** — it ports an uncorrelated stream onto beta (β+α) and
+> scores the combination vs the bogle hurdle *with a crisis-correlation check* (the 2008 tell: does the alpha
+> stay uncorrelated in the tail?). It reclassifies "diversifier, not a market-beater" nulls that are genuine
+> **alpha sources** — [bore](https://github.com/blaquebaux/bore) clears the hurdle ported (crisis-corr −0.39) —
+> while correctly refusing **hedges** with negative carry (BTAL, and bear): hedges don't port, alpha sources do.
 
 | Repo | Focus | State |
 |------|-------|-------|
@@ -309,7 +314,7 @@ and steers it at a different market — one platform, many directions:
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
 | **blaquebaux-brittle** | near-expiry far-OTM options/ETFs | research done (short-vol premium is a trap; naked rejected) |
 | **blaquebaux-broad** | broad-market & thematic ETFs (IVES, GRNY, QQQ, TQQQ) | research done (leverage law; managed-exposure keeper) + **live driver built** — **validation PASS**; consumes **blaquebaux-bonds' regime signal** (overlay **ON**, marginal: full-cycle Sharpe +0.94→+0.96, 95% of return kept). The *only* equity consumer where the overlay survives a full-cycle re-test — it already self-de-risks via trend + vol-target. **Declined** benchmark's `market_regime` (redundant: gating cuts Sharpe +0.84→+0.80, its vol-target already does the vol-timing). **Consumes balanced's `rate_regime` opt-in** (rising rates = growth headwind): lifts Sharpe +0.96→+1.03 / M² +0.8%→+2.0% but 0% DD cut → fails the DD bar, ships opt-in (self-manages, same as market_regime) |
-| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS**. **Declined** benchmark's `market_regime` overlay (measured beta −0.07; gating a neutral book hurts, Sharpe +0.42→+0.31) — wrong signal for a market-neutral book, keeps its own beta hedge |
+| **blaquebaux-bore** | market-neutral, indifferent to bull/bear | research done (beta-hedged keeper) + **live driver built** — **validation PASS**. **Declined** benchmark's `market_regime` overlay (measured beta −0.07; gating a neutral book hurts, Sharpe +0.42→+0.31) — wrong signal for a market-neutral book. **Reclassified as the family's portable-alpha source**: neutral (not a market-beater) standalone, but ported **β+α onto SPY it CLEARS the Bogle hurdle** — Sharpe +0.83→**+0.97**, Jensen α +4.9%, M² +2.4%, and **crisis-corr −0.39** (helps *more* in crashes — the anti-2008 profile). DBMF ports too; BTAL (a hedge) doesn't |
 | **blaquebaux-bulk** | defense / military & adjacent | research done (moderate factor; systematic null) |
 | **blaquebaux-brown** | conservative-leaning sectors (energy, mining, ag, firearms, prisons) | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
 | **blaquebaux-blue** | entertainment/film, green energy, tech | research done (Brown/Blue rotation keeper) + **live driver built** — **validation PASS** |
