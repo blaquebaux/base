@@ -355,6 +355,28 @@ and steers it at a different market — one platform, many directions:
 Cross-family paper A/B is monitored by `scripts/family_summary.py` (each leg's keys live in
 `~/.config/blaquebaux/`, so it snapshots whatever sleeves are active).
 
+### Planned branches — the trunk gaps
+
+The family grew *leaf-first* (funds, sectors, themes); mapping the tree surfaced the **trunk primitives** it
+skipped — fundamental style/asset branches, several of them prime portable-alpha sources. Names reserved,
+not yet built:
+
+| # | name | branch | notes |
+|---|------|--------|-------|
+| 1 | **blaquebaux-brace** | volatility / vol-risk-premium | harvest the premium (put-write, covered calls, short-VXX roll, dispersion) — the counterparty to **bleed** |
+| 2 | **blaquebaux-bounty** | carry (cross-asset) | FX / curve / commodity / vol carry — the missing third of momentum–value–carry |
+| 3 | **blaquebaux-bite** | event-driven / merger-arb | deal spreads, spin-offs, index rebalances — an uncorrelated-alpha source |
+| 4 | **blaquebaux-bridge** | statistical arbitrage / pairs | cointegration & spread mean-reversion — a portable-alpha source |
+| 5 | **blaquebaux-bourse** | rates / FX / commodities, directly | the curve, FX pairs, gold/oil/ags — the asset classes we only touch via ETFs |
+| 6 | **blaquebaux-bloom** | seasonality / calendar anomalies | turn-of-month, sell-in-May, tax-loss January |
+| 7 | **blaquebaux-buzz** | alt-data / sentiment | NLP news/social, earnings-call tone (egress-walled, à la bureaucrats) |
+| 8 | **blaquebaux-breakthrough** | the meta-allocator (**capstone**) | assemble the keepers into one regime-budgeted portfolio — built **last** |
+
+Note **brace / bounty / bridge / bite** are exactly the market-neutral, positive-Sharpe, doesn't-beat-the-index-standalone
+streams the new `portable_alpha` toolkit is built to port — the **bore pattern**, repeatable. And several of
+these are *implemented through* derivatives, so [block](https://github.com/blaquebaux/block)'s catalog is
+where brace (options) and bounty (futures roll) actually get built.
+
 ### Cross-sleeve wiring — published regime signals
 
 Some sleeves *feed* others rather than trade alone. **Four published regime signals** now exist (plus
