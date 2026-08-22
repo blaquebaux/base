@@ -301,7 +301,7 @@ and steers it at a different market — one platform, many directions:
 |------|-------|-------|
 | **blaquebaux** | base engine + validated risk-premium spine | live path (paper) |
 | **blaquebaux-blunt** | short-horizon tactical (crude→refiner sleeve) | live driver built — **validation PASS** |
-| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**. Can consume **blaquebaux-bonds' regime signal** for sizing, but the overlay is **OFF by default**: full-cycle (2016–2026 SIP) re-validation shows 0% DD cut / −0.05 Sharpe — the earlier −22% DD was a 2022-window (IEX-feed) artifact |
+| **blaquebaux-boom** | mega-cap blue chips (momentum tilt) | live driver built — **validation PASS**. **Two regime overlays wired, both OFF by default.** *bonds*: 0% DD cut / −0.05 Sharpe (the earlier −22% DD was a 2022-window IEX artifact). *market_regime* (the **conditional-keeper test**): cuts maxDD **41%** (−19%→−11%), nudges Sharpe +1.22→**+1.26**, lifts M², and **flips skew −0.31→+0.23** (removes the momentum-crash left tail) — but gives back ~20% of return, **failing the retain-80% bar**, because BOOM already vol-targets (self-de-risks, cf. broad/bridgewater). Ships **opt-in** as drawdown/left-tail insurance, not a default keeper |
 | **blaquebaux-brash** | aggressive: crypto, alternatives | research done (growth-vs-ruin lab; fractional-Kelly rule) + **live driver built** — ETF-proxy gate MIXED; thesis PASSES on the real crypto rail (+0.72 aggressive), **crypto execution now wired** — trades real BTC/ETH (aggressive, governed) |
 | **blaquebaux-bleed** | contrarian; positioned for the tails | research done (regime-spanning tail basket) + **live driver built** — **validation PASS** (as insurance: +79% vs SPY -82% on crash days) |
 | **blaquebaux-bottom** | sub-small-cap / penny names | research done (cap-ladder bounce rejected; a large-cap play) + **live driver built** — **validation PASS** |
@@ -363,9 +363,11 @@ matched to the sleeves it actually helps — the discipline is *match the signal
   **earned by naive high-beta books with no risk control** — benchmark's own gated-SPY (SPY +0.87→+1.11)
   and now **[blackstone](https://github.com/blaquebaux/blackstone)**, the first *consumer* sleeve to earn
   it (levered listed-PE, Sharpe +0.76→+0.95 / DD −45%→−31% / CAGR flat) — and **declined by the
-  managed/neutral sleeves** — `broad` (redundant with its trend+vol-target, +0.84→+0.80) and `bore`
-  (market-neutral → wrong signal). So it's earned where nothing else manages the vol, and correctly
-  refused everywhere that already does.
+  managed/neutral sleeves** — `broad` (redundant with its trend+vol-target, +0.84→+0.80), `bore`
+  (market-neutral → wrong signal), and `boom` (the **conditional-keeper test**: cuts DD 41% and flips skew
+  −0.31→+0.23, i.e. removes the momentum-crash left tail, but gives back ~20% return → fails the retain-80%
+  bar since it already vol-targets; ships **opt-in insurance**, not default). So it's earned where nothing
+  else manages the vol, and refused (or made opt-in) everywhere that already does.
 
 **The bonds (stock-bond) overlay**, consumed to de-risk gross when the bond hedge is dead. Each consumer
 is validated independently on the **full 2016–2026 SIP history** — it ships on *only* where it earns it:
