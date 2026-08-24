@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this software or research, please cite it using the metadata below."
+title: "BLAQUE BAUX Base: Governed Systematic Risk-Premium Infrastructure"
+type: software
+authors:
+  - name: "BLAQUE BAUX"
+repository-code: "https://github.com/blaquebaux/base"
+url: "https://www.blaquebaux.com"
+license: MIT
+keywords:
+  - systematic research
+  - quantitative finance
+  - risk management
+  - portfolio construction
+  - Julia

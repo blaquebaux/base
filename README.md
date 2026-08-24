@@ -1,5 +1,7 @@
 # Blaque Baux
 
+> **LIVE SYSTEM · GOVERNED SPINE** &nbsp;|&nbsp; Julia &nbsp;|&nbsp; [Research platform](https://www.blaquebaux.com) &nbsp;|&nbsp; [Full corpus](https://www.blaquebaux.com/corpus/) &nbsp;|&nbsp; [Citation](CITATION.cff)
+
 **A governed, systematic risk-premium harvesting platform — in Julia.**
 
 Blaque Baux does *not* try to predict returns. After rigorous out-of-sample testing found no
