@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+:root{
+  --bb-paper:#f3f3f1;
+  --bb-panel:#e8e9e9;
+  --bb-ink:#111315;
+  --bb-muted:#5d6369;
+  --bb-dim:#868b90;
+  --bb-line:#b7bcc0;
+  --bb-line-dark:#8f969c;
+  --bb-green:#087a46;
+  --bb-red:#b63d4b;
+  --bb-amber:#9a6a18;
+  --bb-blue:#315d78;
+}
+
+html,body{background:var(--bb-paper)!important;color:var(--bb-ink)!important}
+body{font-family:"Space Grotesk",sans-serif!important;font-size:15px!important;line-height:1.62!important}
+p,li,td,figcaption,.dek,.sub,.disc{font-family:"Space Grotesk",sans-serif!important}
+h1,h2,h3,h4{font-family:"Space Grotesk",sans-serif!important;font-style:normal!important;font-weight:500!important;letter-spacing:.015em!important}
+h1{line-height:.94!important;text-transform:uppercase!important;letter-spacing:.045em!important}
+h2{line-height:1.1!important;text-transform:uppercase!important;letter-spacing:.04em!important}
+.eyebrow,.byline,.meta,.foot,.fig-h,.lab,.n,.s,code,.tick,th{
+  font-family:"IBM Plex Mono",monospace!important;
+  letter-spacing:.1em!important;
+  text-transform:uppercase!important;
+}
+.masthead{background:var(--bb-panel)!important;color:var(--bb-ink)!important;border:1px solid var(--bb-line-dark)!important;border-width:1px 0!important}
+.masthead h1,.masthead h2,.masthead p,.masthead strong,.masthead b{color:var(--bb-ink)!important}
+.masthead .eyebrow,.masthead .byline{color:var(--bb-muted)!important}
+.byline{border-color:var(--bb-line)!important}
+.abstract,.status,.law,.eq,figure,.score,.stats,.note,.callout,.box{
+  background:rgba(232,233,233,.6)!important;
+  color:var(--bb-ink)!important;
+  border-color:var(--bb-line-dark)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.law{border-left:4px solid var(--bb-red)!important}
+.status{border-left:4px solid var(--bb-amber)!important}
+.coda{background:var(--bb-ink)!important;color:var(--bb-paper)!important;border-color:var(--bb-red)!important}
+.coda h2,.coda h3,.coda p,.coda strong{color:var(--bb-paper)!important}
+.score,.stats{gap:0!important;border-radius:0!important}
+.score .row,.stat{background:transparent!important;border-bottom:1px solid var(--bb-line)!important}
+table{background:transparent!important}
+th,td{border-color:var(--bb-line)!important}
+thead th{color:var(--bb-muted)!important;border-color:var(--bb-line-dark)!important}
+a,.neg,.v-null{color:var(--bb-red)!important}
+.pos,.v-keep,.validated{color:var(--bb-green)!important}
+
+@page{size:Letter;margin:15mm 14mm 16mm}
+@media print{
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-size:10.5pt!important;line-height:1.5!important}
+  p,li{orphans:3;widows:3}
+  .wrap{max-width:100%!important;padding:0!important}
+  .masthead{
+    min-height:248mm!important;
+    margin:0!important;
+    padding:22mm 16mm!important;
+    display:flex!important;
+    align-items:center!important;
+    break-after:page!important;
+    page-break-after:always!important;
+  }
+  .masthead .col{width:100%!important}
+  .masthead h1{font-size:40pt!important;max-width:11ch!important}
+  .masthead .sub{font-size:15pt!important;max-width:30ch!important}
+  .masthead .byline{margin-top:13mm!important;padding-top:5mm!important}
+  h2{font-size:18pt!important;margin-top:8mm!important}
+  h3{font-size:13pt!important}
+  section{padding-top:3mm!important;padding-bottom:3mm!important}
+  figure,.eq,.abstract,.status,.law,.stats,.note,.callout,.box{break-inside:avoid;page-break-inside:avoid}
+  table{break-inside:auto!important;page-break-inside:auto!important}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .score .row{break-inside:avoid;page-break-inside:avoid}
+  h1,h2,h3,h4{break-after:avoid;page-break-after:avoid}
+  a{color:inherit!important;text-decoration:none!important}
+  .coda{
+    min-height:248mm!important;
+    margin:0!important;
+    padding:18mm 16mm!important;
+    display:flex!important;
+    align-items:center!important;
+    break-before:page!important;
+    page-break-before:always!important;
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+  .coda .col{width:100%!important}
+}
