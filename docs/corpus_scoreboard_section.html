@@ -104,8 +104,8 @@
         'kept visible because a strategy is only as trustworthy as the ideas it was willing to kill.';
     }
 
-    var t=tallyFromDOM();
-    if(t && Object.keys(t).length) render(t,true); else render(SNAPSHOT,false);
+    function boot(){var t=tallyFromDOM(); if(t && Object.keys(t).length) render(t,true); else render(SNAPSHOT,false);}
+    if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot); else boot();
   })();
   </script>
 </section>
