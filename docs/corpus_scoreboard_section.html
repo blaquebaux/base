@@ -1,0 +1,112 @@
+<!-- ============================================================================================
+  Corpus family scoreboard — HAND-OFF for blaquebaux/site → corpus/index.html
+  Drop this <section> in ABOVE or BELOW the repo grid. Self-contained (scoped styles + JS), dark palette
+  (uses the corpus page vars --bg/--fg/--muted/--line/--green/--red).
+
+  SELF-SYNCING: it READS the .status labels off the repo cards already on the page and tallies live —
+  so it always matches whatever cards are present, with zero JSON to maintain. If no cards are found
+  (e.g. previewed in isolation) it falls back to the embedded SNAPSHOT and flags it.
+  It counts the governance ladder: ● LIVE / LIVE PATH / LIVE DRIVER / GOVERNED / VALIDATION / RESEARCH
+  / CONCEPT / NULL — and derives live-money paths, validated-or-better, and the red-scorecard ratio.
+============================================================================================= -->
+<section class="corpus-scoreboard" aria-labelledby="csb-title">
+  <style>
+    .corpus-scoreboard{padding:52px 0;border-top:1px solid var(--line)}
+    .corpus-scoreboard .micro{color:var(--muted);letter-spacing:.16em;text-transform:uppercase;font-size:11px;font-family:"IBM Plex Mono",monospace}
+    .corpus-scoreboard h2{font-size:clamp(22px,3vw,34px);margin:.35em 0 .2em;color:var(--fg)}
+    .corpus-scoreboard .csb-lead{color:var(--muted);max-width:74ch;margin:0 0 30px}
+    .csb-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:34px}
+    .csb-tile{background:var(--bg);padding:18px 20px}
+    .csb-tile b{font-family:"IBM Plex Mono",monospace;font-size:30px;color:var(--fg);display:block;line-height:1}
+    .csb-tile b.good{color:var(--green)} .csb-tile b.red{color:var(--red)}
+    .csb-tile span{display:block;margin-top:8px;color:var(--muted);font-size:12.5px}
+    .csb-ladder{display:grid;gap:9px;margin-top:6px}
+    .csb-row{display:grid;grid-template-columns:130px 1fr 40px;align-items:center;gap:12px;font-size:13px}
+    .csb-row .lab{color:var(--fg);font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.04em}
+    .csb-row .track{height:12px;background:#11161c;border:1px solid var(--line)}
+    .csb-row .track i{display:block;height:100%}
+    .csb-row .n{font-family:"IBM Plex Mono",monospace;text-align:right;color:var(--muted)}
+    .csb-note{margin-top:26px;color:var(--muted);font-size:11.5px;max-width:82ch;font-family:"IBM Plex Mono",monospace;line-height:1.6}
+    .csb-note .live{color:var(--green)} .csb-note .snap{color:var(--red)}
+  </style>
+
+  <div class="shell">
+    <div class="micro">The corpus / by the numbers</div>
+    <h2 id="csb-title">A research program, scored in the open.</h2>
+    <p class="csb-lead">Every repository sits somewhere on one ladder — from an idea, through testing, to a
+      validated keeper, to a governed live rail. Most ideas don't make it, and the ones that died stay published.
+      That the graveyard is the largest tier is not an accident; it's the standard.</p>
+
+    <div class="csb-strip" id="csb-strip"></div>
+    <div class="csb-ladder" id="csb-ladder"></div>
+    <p class="csb-note" id="csb-note"></p>
+  </div>
+
+  <script>
+  (function(){
+    // canonical ladder order + colors (dark palette vars)
+    var ORDER=["● LIVE","LIVE PATH","LIVE DRIVER","GOVERNED","VALIDATION","RESEARCH","CONCEPT","NULL"];
+    var COLOR={"● LIVE":"var(--green)","LIVE PATH":"var(--green)","LIVE DRIVER":"var(--green)","GOVERNED":"var(--green)",
+               "VALIDATION":"var(--fg)","RESEARCH":"var(--muted)","CONCEPT":"var(--muted)","NULL":"var(--red)"};
+    var SNAPSHOT={"● LIVE":1,"LIVE PATH":5,"LIVE DRIVER":3,"GOVERNED":7,"VALIDATION":11,"RESEARCH":9,"CONCEPT":6,"NULL":20};
+    var LIVEMONEY={"● LIVE":1,"LIVE PATH":1,"LIVE DRIVER":1,"GOVERNED":1};
+
+    function tallyFromDOM(){
+      var t={}, nodes=document.querySelectorAll('.status'); if(!nodes.length) return null;
+      nodes.forEach(function(el){
+        var lab=(el.textContent||"").trim();                 // e.g. "● GOVERNED", "NULL"
+        // normalize: keep the dot for LIVE, uppercase the words
+        lab=lab.replace(/\s+/g," ").toUpperCase();
+        if(lab.indexOf("LIVE")===0 && lab.indexOf("PATH")<0 && lab.indexOf("DRIVER")<0) lab="● LIVE";
+        else lab=lab.replace(/^●\s*/,"");
+        if(lab==="LIVE") lab="● LIVE";
+        // map any leading-dot LIVE PATH/DRIVER back to canonical
+        lab=lab.replace("● LIVE PATH","LIVE PATH").replace("● LIVE DRIVER","LIVE DRIVER");
+        t[lab]=(t[lab]||0)+1;
+      });
+      return t;
+    }
+
+    function render(t,live){
+      var total=0; Object.keys(t).forEach(function(k){total+=t[k];});
+      var liveMoney=0,validatedPlus=0,nulls=t["NULL"]||0;
+      Object.keys(t).forEach(function(k){ if(LIVEMONEY[k]){liveMoney+=t[k];} });
+      validatedPlus=liveMoney+(t["VALIDATION"]||0);
+      var red=total?Math.round(100*nulls/total):0;
+
+      var strip=document.getElementById("csb-strip"); strip.innerHTML="";
+      var tile=function(v,s,cls){var e=document.createElement("div");e.className="csb-tile";
+        var b=document.createElement("b"); if(cls)b.className=cls; b.textContent=v;
+        var sp=document.createElement("span"); sp.textContent=s; e.appendChild(b); e.appendChild(sp); return e;};
+      strip.appendChild(tile(total,"public repositories"));
+      strip.appendChild(tile(liveMoney,"on live-money paths","good"));
+      strip.appendChild(tile(validatedPlus,"validated or better"));
+      strip.appendChild(tile(nulls,"published nulls (graveyard)","red"));
+      strip.appendChild(tile(red+"%","red scorecard","red"));
+
+      var lad=document.getElementById("csb-ladder"); lad.innerHTML="";
+      var max=Math.max.apply(null,ORDER.map(function(k){return t[k]||0;}));
+      ORDER.forEach(function(k){
+        if(!(k in t)) return;
+        var r=document.createElement("div"); r.className="csb-row";
+        var l=document.createElement("span"); l.className="lab"; l.textContent=k; r.appendChild(l);
+        var tr=document.createElement("span"); tr.className="track";
+        var i=document.createElement("i"); i.style.width=Math.round(100*(t[k]||0)/max)+"%"; i.style.background=COLOR[k]||"var(--muted)";
+        tr.appendChild(i); r.appendChild(tr);
+        var n=document.createElement("span"); n.className="n"; n.textContent=t[k]; r.appendChild(n);
+        lad.appendChild(r);
+      });
+
+      document.getElementById("csb-note").innerHTML='<span class="'+(live?"live":"snap")+'">'+
+        (live?"● live — tallied from the cards on this page":"● snapshot — cards not detected, showing last-known")+
+        '</span>. The ladder runs idea → tested → validated keeper → governed live rail; live-money paths = '+
+        'LIVE + LIVE PATH + LIVE DRIVER + GOVERNED. The red-scorecard share is published nulls over all repos — '+
+        'kept visible because a strategy is only as trustworthy as the ideas it was willing to kill.';
+    }
+
+    var t=tallyFromDOM();
+    if(t && Object.keys(t).length) render(t,true); else render(SNAPSHOT,false);
+  })();
+  </script>
+</section>
+<!-- ========================================================================================= -->
