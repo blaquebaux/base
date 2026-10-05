@@ -69,6 +69,18 @@ function main(; universe = UNIVERSE, capital = 100_000.0, pool = "us", regime = 
 
         hwm      = max(load_hwm(hwm_path), acct.equity)
         last_eq  = _readf(equity_path)
+        # ── gap-resumption guard ──────────────────────────────────────────────────
+        # If the baseline is STALE (the driver didn't run for several days — e.g. the machine was off), the
+        # daily-loss gate reads a multi-day equity change as ONE day's loss and false-halts. Treat the first
+        # run after a gap as a fresh start: reset the baseline to current equity so the loss guard measures
+        # TODAY and re-arms normally from here. Drawdown-vs-HWM is untouched (HWM persists). Threshold
+        # BB_GAP_DAYS (default 6) is wide enough to never trip on a normal weekend/holiday gap.
+        _gap_days = parse(Float64, get(ENV, "BB_GAP_DAYS", "6"))
+        if isfinite(last_eq) && isfile(equity_path) && (time() - mtime(equity_path)) > _gap_days * 86400
+            _aged = round((time() - mtime(equity_path)) / 86400, digits = 1)
+            @warn "gap-resumption: baseline $_aged days stale — resetting to current equity; daily-loss guard re-arms today" last_eq acct_equity=acct.equity
+            last_eq = acct.equity
+        end
         panel    = panel_at(AlpacaPanelProvider(universe; lookback = 252))
         fresh    = (Dates.today() - panel.asof) <= Day(5)
 

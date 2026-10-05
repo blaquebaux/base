@@ -71,6 +71,16 @@ function main(; capital = 100_000.0, pool = "us", regime = :dd, base_weight = 0.
 
         hwm      = max(load_hwm(hwm_path), acct.equity)
         last_eq  = _readf(equity_path)
+        # ── gap-resumption guard ──────────────────────────────────────────────────
+        # Stale baseline (driver off several days) would read a multi-day change as one day's loss and
+        # false-halt. Reset to current equity on a gap so the daily-loss guard measures TODAY and re-arms.
+        # Drawdown-vs-HWM untouched. BB_GAP_DAYS (default 6) never trips on a normal weekend/holiday gap.
+        _gap_days = parse(Float64, get(ENV, "BB_GAP_DAYS", "6"))
+        if isfinite(last_eq) && isfile(equity_path) && (time() - mtime(equity_path)) > _gap_days * 86400
+            _aged = round((time() - mtime(equity_path)) / 86400, digits = 1)
+            @warn "gap-resumption: baseline $_aged days stale — resetting to current equity; daily-loss guard re-arms today" last_eq acct_equity=acct.equity
+            last_eq = acct.equity
+        end
         panel    = panel_at(AlpacaPanelProvider(SPLIT_UNION; lookback = 252))
         fresh    = (Dates.today() - panel.asof) <= Day(5)
 
