@@ -50,6 +50,7 @@ include("module_10_feedback/module_10_feedback.jl")
 include("module_11_cv/module_11_cv.jl")
 include("module_12_sor/module_12_sor.jl")
 include("module_13_portfolio/module_13_portfolio.jl")
+include("module_14_nullbar/module_14_nullbar.jl")
 
 using .DataIngestion
 using .SignalSmoothing
@@ -64,11 +65,12 @@ using .FeedbackLayer
 using .CVLayer
 using .SORLayer
 using .PortfolioOptModule
+using .Nullbar
 
 # Export all public APIs
 export DataIngestion, SignalSmoothing, PCACompression, ARMAGARCH, DPM
 export CascadeInterface, ExecutionLayer, Governance, ZeroDTE, FeedbackLayer
-export CVLayer, SORLayer, PortfolioOptModule
+export CVLayer, SORLayer, PortfolioOptModule, Nullbar
 
 # Convenience functions for orchestration
 export run_weekly_em, run_daily_recursive, run_backtest_validation
