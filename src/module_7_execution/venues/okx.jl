@@ -55,7 +55,7 @@ mutable struct OKXVenue <: ExecutionVenue
     seen::Set{String}
     _lock::ReentrantLock
 end
-OKXVenue(cfg::OKXConfig = OKXConfig()) = OKXVenue(cfg, false, Dict{String,NamedTuple{(:ctVal,:lotSz,:minSz),Tuple{Float64,Float64,Float64}}}(), now(UTC), Set{String}(), ReentrantLock())
+OKXVenue(cfg::OKXConfig) = OKXVenue(cfg, false, Dict{String,NamedTuple{(:ctVal,:lotSz,:minSz),Tuple{Float64,Float64,Float64}}}(), now(UTC), Set{String}(), ReentrantLock())
 OKXVenue(; kwargs...) = OKXVenue(OKXConfig(; kwargs...))
 
 _okeys(v::OKXVenue) = !isempty(v.cfg.key_id) && !isempty(v.cfg.secret) && !isempty(v.cfg.passphrase)

@@ -50,7 +50,7 @@ mutable struct AlpacaVenue <: ExecutionVenue
     seen::Set{String}            # venue order ids already emitted as fills
     _lock::ReentrantLock
 end
-AlpacaVenue(cfg::AlpacaConfig = AlpacaConfig()) =
+AlpacaVenue(cfg::AlpacaConfig) =
     AlpacaVenue(cfg, false, now(UTC), Set{String}(), ReentrantLock())
 AlpacaVenue(; kwargs...) = AlpacaVenue(AlpacaConfig(; kwargs...))
 

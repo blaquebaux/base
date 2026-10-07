@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "a379f905c306864a0f0634cb3e2263cb41fb20ac"
+project_hash = "d7fe1055ec3d76945ac67a7a4b784684ec5f413b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -132,7 +132,7 @@ uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
 version = "0.1.10"
 
 [[deps.BlaqueBaux]]
-deps = ["CSV", "Clarabel", "Clustering", "DSP", "DataFrames", "Dates", "Distributions", "HTTP", "JLD2", "JSON3", "Jib", "JuMP", "LinearAlgebra", "Loess", "Logging", "MultivariateStats", "Optim", "Random", "RollingFunctions", "SQLite", "Sockets", "SpecialFunctions", "Statistics", "StatsBase", "TimeSeries", "TimeZones"]
+deps = ["Base64", "CSV", "Clarabel", "Clustering", "DSP", "DataFrames", "Dates", "DelimitedFiles", "Distributions", "HTTP", "JLD2", "JSON3", "Jib", "JuMP", "LinearAlgebra", "Loess", "Logging", "MultivariateStats", "Optim", "Printf", "Random", "RollingFunctions", "SHA", "SQLite", "Sockets", "SpecialFunctions", "Statistics", "StatsBase", "TimeSeries", "TimeZones"]
 path = "."
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "1.0.0"
