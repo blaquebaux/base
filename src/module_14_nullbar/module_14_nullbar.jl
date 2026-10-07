@@ -17,7 +17,9 @@ export TradeLog, BlindResult, effective_n, run_blind_test,
        FrictionModel, StaticFriction, InstitutionalFriction, slippage, apply_friction, capacity_curve,
        benjamini_hochberg, corpus_fdr, Keeper, shrink_returns, allocate_capital,
        correlation_map, factor_exposure, RegimeFilter, apply_stress,
-       PASS_THROUGH, FILTER_ONLY, INVERT_ONLY, ASYMMETRIC
+       PASS_THROUGH, FILTER_ONLY, INVERT_ONLY, ASYMMETRIC,
+       prefix_invariance, parameter_budget, plateau_score, economic_significance,
+       sharpe_haircut, forecast_encompassing, monotone_corpus_bar, asset_attribution
 
 # ---- normal cdf / inverse-normal (stdlib only) ------------------------------------------------------
 _erf(x) = (t = 1/(1+0.3275911abs(x)); s = 1 - (((((1.061405429t-1.453152027)t)+1.421413741)t-0.284496736)t+0.254829592)t*exp(-x^2); x ≥ 0 ? s : -s)
@@ -278,6 +280,109 @@ function apply_stress(raw::Vector{Float64}, rf::RegimeFilter)
     elseif rf.mode == INVERT_ONLY; s[g] .= -s[g]
     elseif rf.mode == ASYMMETRIC; s[(.!g) .& (s.<0)] .= 0.0; s[g .& (s.>0)] .= 0.0; end
     return s
+end
+
+# ============================================================================
+# BATCH 2 — causality / overfitting / economic / haircut / encompassing / search-gaming / attribution
+# ============================================================================
+
+"Causal prefix-invariance (lookahead) gate. strategy_fn(prices[1:k]) must return positions,
+one per bar seen. A causal rule's position at bar i is identical whether it saw k bars or all;
+this reveals growing prefixes and flags any past position that moves. DSR/PBO can't catch
+look-ahead if the backtest peeks — this proves position integrity."
+function prefix_invariance(strategy_fn, prices::Vector{Float64}; probes::Int=24, tol=1e-9)
+    T = length(prices); T < 10 && return (is_causal=true, n_violations=0, violations=NamedTuple[], verdict="CAUSAL")
+    full = Float64.(strategy_fn(prices))
+    cuts = sort(unique(round.(Int, range(max(5, T ÷ 20), T, length=probes))))
+    viol = NamedTuple[]
+    for k in cuts
+        pk = Float64.(strategy_fn(prices[1:k])); m = min(length(pk), length(full), k)
+        d = abs.(pk[1:m] .- full[1:m]); bad = findall(>(tol), d)
+        isempty(bad) || push!(viol, (prefix=k, first_changed_bar=bad[1], n_changed=length(bad), max_delta=maximum(d[bad])))
+    end
+    leak = !isempty(viol)
+    return (is_causal=!leak, n_violations=length(viol), violations=first(viol, min(5, length(viol))),
+            verdict = leak ? "LOOKAHEAD" : "CAUSAL")
+end
+
+"Degrees-of-freedom gate: the observation that counts is a TRADE, not a bar. Reject below
+min_ratio trades per free parameter (default 50:1), whatever PBO says."
+function parameter_budget(n_trades, n_params; min_ratio=50.0)
+    ratio = n_trades / max(n_params, 1)
+    return (n_trades=n_trades, n_params=n_params, ratio=ratio, min_ratio=min_ratio, passes=ratio ≥ min_ratio,
+            verdict = ratio ≥ min_ratio ? "OK" : "OVERFIT-RISK (too few trades per parameter)")
+end
+
+"Peak-vs-ridge audit of a parameter sweep. grid: a metric over two swept params. Score in [0,1]:
+1 ⇒ best cell's neighbours nearly as good (ridge); 0 ⇒ neighbours sink to the grid mean (spike)."
+function plateau_score(grid::Matrix{Float64})
+    gmean = sum(grid)/length(grid); idx = argmax(grid); peak = grid[idx]; i, j = idx[1], idx[2]
+    nb = Float64[]
+    for (di, dj) in ((1,0),(-1,0),(0,1),(0,-1))
+        a, b = i+di, j+dj
+        (1 ≤ a ≤ size(grid,1) && 1 ≤ b ≤ size(grid,2)) && push!(nb, grid[a,b])
+    end
+    (isempty(nb) || peak ≤ gmean) && return (score=0.0, peak=peak, verdict="SPIKE")
+    nbr = sum(nb)/length(nb); sc = clamp((nbr - gmean)/(peak - gmean), 0, 1)
+    return (score=sc, peak=peak, nbr_mean=nbr, grid_mean=gmean, verdict = sc ≥ 0.5 ? "RIDGE" : "SPIKE")
+end
+
+"Economic-significance gate (statistical ≠ economic). net_alpha_ann must clear a PRE-REGISTERED
+hurdle (default 2%/yr) AND, if given, significance. A significant but trivial edge is not a keeper."
+function economic_significance(net_alpha_ann; hurdle=0.02, t_stat=nothing, min_t=2.0)
+    econ = net_alpha_ann ≥ hurdle; stat = t_stat === nothing ? true : abs(t_stat) ≥ min_t
+    v = econ && stat ? "KEEPER" : (stat && !econ ? "TRIVIAL — significant but below the economic hurdle" :
+        (econ && !stat ? "NOISY — large but not statistically distinguishable" : "REJECT"))
+    return (net_alpha_ann=net_alpha_ann, hurdle=hurdle, clears_hurdle=econ, significant=stat, is_keeper=econ&&stat, verdict=v)
+end
+
+"Harvey-Liu nonlinear multiple-testing haircut on an annualized Sharpe — brutal on marginal SRs,
+mild on exceptional ones. SR→t→p, deflate p for n_trials, map back to a haircut Sharpe."
+function sharpe_haircut(sharpe_ann, n_trials, T_years; method::Symbol=:bhy)
+    T = max(T_years, 1e-6); t = sharpe_ann*sqrt(T); p = 2*(1 - _ncdf(abs(t)))
+    p_adj = method === :bonferroni ? min(1.0, p*n_trials) :
+            method === :holm ? min(1.0, p*n_trials) : min(1.0, p*n_trials/(1 + log(max(n_trials,1))))
+    sr_adj = max(_nppf(1 - p_adj/2)/sqrt(T), 0.0); hc = sharpe_ann > 0 ? 1 - sr_adj/sharpe_ann : 1.0
+    return (sharpe=sharpe_ann, sharpe_haircut=sr_adj, haircut_pct=clamp(hc, 0, 1), n_trials=n_trials, method=method)
+end
+
+"Fair-Shiller / HLN forecast encompassing. Regress realized on [1, f1, f2]: if f2's coef is
+insignificant given f1, f1 ENCOMPASSES f2 (f2 redundant); if both significant, combine. Forecast-
+level companion to the factor-level correlation map."
+function forecast_encompassing(realized::Vector{Float64}, f1::Vector{Float64}, f2::Vector{Float64})
+    L = min(length(realized), length(f1), length(f2))
+    y = realized[end-L+1:end]; a = f1[end-L+1:end]; b = f2[end-L+1:end]
+    X = hcat(ones(L), a, b); β, t, _ = _ols(y, X)
+    enc12 = abs(t[3]) < 2.0; enc21 = abs(t[2]) < 2.0
+    v = enc12 && !enc21 ? "F1 ENCOMPASSES F2 (f2 redundant)" :
+        (enc21 && !enc12 ? "F2 ENCOMPASSES F1 (f1 redundant)" :
+        (!enc12 && !enc21 ? "NEITHER ENCOMPASSES (both add — combine)" : "BOTH WEAK"))
+    return (t_f1=t[2], t_f2=t[3], combine=(!enc12 && !enc21), verdict=v)
+end
+
+"Search-gaming defense. A budgeted search can dilute its own FDR bar by funding near-mean trials
+(N up, dispersion barely moves). Two pre-registered guards: a variance FLOOR, and a MONOTONE
+high-water-mark bar that never decreases as trials accumulate."
+function monotone_corpus_bar(trial_sharpes::Vector{Float64}; var_floor=nothing, ppy=252)
+    g = 0.5772156649; bar = Float64[]; hwm = 0.0
+    for n in 1:length(trial_sharpes)
+        sd = std(trial_sharpes[1:n])/sqrt(ppy); var_floor === nothing || (sd = max(sd, var_floor))
+        emax = n > 1 ? sd*((1-g)*_nppf(1 - 1/n) + g*_nppf(1 - 1/(n*ℯ)))*sqrt(ppy) : 0.0
+        hwm = max(hwm, emax); push!(bar, hwm)
+    end
+    return (monotone_bar=bar, final_bar=isempty(bar) ? 0.0 : bar[end], var_floor=var_floor)
+end
+
+"Decision-chain audit (asset-selection cut). contribs: name⇒total P&L. If a few names carry the
+edge (top-3 > 75% or effective names < 3), the 'strategy alpha' is asset-selection alpha."
+function asset_attribution(contribs::Dict{String,Float64})
+    names = collect(keys(contribs)); v = [contribs[n] for n in names]
+    pos = max.(v, 0.0); tot = sum(pos); tot ≤ 0 && return (verdict="NO POSITIVE CONTRIBUTION", eff_names=NaN)
+    w = pos ./ tot; ord = sortperm(w, rev=true)
+    top1 = w[ord[1]]; top3 = sum(w[ord[1:min(3,end)]]); eff = 1/sum(w.^2)
+    return (top1_share=top1, top3_share=top3, eff_names=eff, n=length(names),
+            top_names=names[ord[1:min(3,end)]],
+            verdict = (top3 > 0.75 || eff < 3) ? "ASSET-SELECTION ALPHA (logic is a carrier)" : "DISTRIBUTED (logic plausibly adds)")
 end
 
 end # module Nullbar
