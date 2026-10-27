@@ -4,6 +4,7 @@ using Test, Dates, TimeZones
 
 include("../src/module_8_governance/module_8_governance.jl")
 using .Governance
+using Statistics: std, mean
 
 @testset "Governance Module - Comprehensive" begin
 

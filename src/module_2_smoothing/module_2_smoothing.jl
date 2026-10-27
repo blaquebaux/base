@@ -1,6 +1,7 @@
 module SignalSmoothing
 
 using Loess, DSP, Statistics, Random
+using LinearAlgebra: dot
 
 export LOWESSConfig, SGConfig, AdaptiveMedianConfig, BootstrapConfig, SmoothingPipelineConfig,
        lowess_smooth, savgol_filter, adaptive_rolling_median, block_bootstrap,

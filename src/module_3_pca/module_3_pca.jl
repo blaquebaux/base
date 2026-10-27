@@ -295,8 +295,8 @@ end
 
 Z-score standardize each row (variable) of matrix X.
 """
-function _standardize(X::Matrix{Float64})::Matrix{Float64}
-    X_std = similar(X)
+function _standardize(X::AbstractMatrix{<:Real})::Matrix{Float64}
+    X_std = Matrix{Float64}(undef, size(X))
     for i in 1:size(X, 1)
         row = X[i, :]
         mu = mean(row)

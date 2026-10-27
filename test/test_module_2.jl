@@ -4,6 +4,8 @@ using Test
 
 include("../src/module_2_smoothing/module_2_smoothing.jl")
 using .SignalSmoothing
+using LinearAlgebra: dot
+using Statistics: var
 
 @testset "SignalSmoothing Module - Comprehensive" begin
 

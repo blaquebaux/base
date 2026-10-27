@@ -4,6 +4,10 @@ using Test, Dates, TimeZones
 
 include("../src/module_7_execution/module_7_execution.jl")
 using .ExecutionLayer
+# @enum members and helpers used bare by the tests (enum members are not exported
+# with the enum type) and absent from the module `export` list.
+using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
+    EMERGENCY_LIQUIDATION, COOLDOWN, measure_latency
 
 @testset "ExecutionLayer Module - Comprehensive" begin
 

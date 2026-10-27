@@ -4,6 +4,7 @@ using Test
 
 include("../src/module_6_cascade/module_6_cascade.jl")
 using .CascadeInterface
+using .CascadeInterface: create_gamma_arma_output
 
 @testset "CascadeInterface Module - Comprehensive" begin
 
