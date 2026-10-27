@@ -18,6 +18,11 @@ using Statistics: mean, std
 # @enum members are not exported with the enum type.
 using .ExecutionLayer: NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH, EMERGENCY_LIQUIDATION
 using .DataIngestion: assemble_market_state
+using Random
+
+# Seed deterministically so the statistical assertions are reproducible whether this
+# file runs standalone or inside runtests.jl (shared RNG advanced by prior suites).
+Random.seed!(20260101)
 
 @testset "End-to-End Integration Tests" begin
 
@@ -188,9 +193,9 @@ using .DataIngestion: assemble_market_state
         end
 
         # Use daily model for cascade
-        # DPM has ≥5 components; take the top 3 weights and renormalize to a valid
-        # 3-regime distribution (RegimeProbs requires the entries to sum to 1).
-        top3 = daily_model.weights[1:3]
+        # DPM has ≥5 components; project onto 3 regimes by taking the 3 largest
+        # weights (the first few components can be empty) and renormalizing to sum 1.
+        top3 = daily_model.weights[sortperm(daily_model.weights; rev=true)[1:3]]
         probs = RegimeProbs(top3 ./ sum(top3))
         blended = blend_cascade_params(probs)
 

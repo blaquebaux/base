@@ -11,8 +11,13 @@ include("../src/module_7_execution/module_7_execution.jl")
 
 using .DataIngestion, .SignalSmoothing, .ARMAGARCH, .DPM, .CascadeInterface, .ExecutionLayer
 using Statistics: mean, std
+using Random
 # @enum members are not exported with the enum type.
 using .ExecutionLayer: NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH, EMERGENCY_LIQUIDATION
+
+# Seed deterministically so the statistical assertions are reproducible whether this
+# file runs standalone or inside runtests.jl (shared RNG advanced by prior suites).
+Random.seed!(20260101)
 
 @testset "Stress Tests & Edge Cases" begin
 
