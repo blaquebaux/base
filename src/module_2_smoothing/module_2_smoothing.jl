@@ -170,9 +170,11 @@ function lowess_smooth(
             weights = @. min(1.0, (6.0 * mad_val / abs(residuals))^2)
             weights[isnan.(weights)] .= 0.0
 
-            # Re-fit with weights (simplified: use weighted least squares approximation)
+            # Re-fit with weights (simplified: use weighted least squares approximation).
+            # y_valid is already y[valid_idx]; indexing it again by valid_idx was an
+            # out-of-range double-index (NaN-removed vector is shorter than n).
             weighted_y = y .* weights
-            model = loess(x_valid, y_valid[valid_idx], span=config.bandwidth)
+            model = loess(x_valid, y_valid, span=config.bandwidth)
             smoothed = predict(model, x)
         end
     end
