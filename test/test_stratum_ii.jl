@@ -9,8 +9,16 @@
 # Pattern: simulate(true_params) → infer() → compare to true_params
 # =============================================================================
 
-include("StructuralStatistics_v2.jl")
+include("../src/StructuralStatistics.jl")
 using .StructuralStatistics
+# These are part of the Stratum II public surface but not in the module's `export`
+# list; bring them in explicitly so the gate tests resolve them (test-scoped).
+using .StructuralStatistics: select_n_regimes, StudentTEmission, HMMConfig,
+    clean_covariance_rmt, estimate_sigma2_from_bulk, rolling_eigenvector_stability,
+    constrain_transition_matrix!, cross_model_audit, compute_embargo_from_autocorr,
+    generate_purged_splits, rpca_admm, fit_mp_to_spectrum, Ergodic, Absorbing,
+    validate_rpca_decomposition, detect_information_leak, run_stratum_ii_audit,
+    tune_lambda_rpca, validate_hmm_economics
 using LinearAlgebra, Statistics, Random, Test
 
 Random.seed!(2025)
@@ -91,18 +99,18 @@ X   = F * β' .+ 0.05*randn(n, p)
 
 # MP should identify approximately the right number of signal factors
 # Tolerance: ±2 factors (realistic for finite samples)
-@test abs(rpt.n_signal - rank_true) ≤ 3 "RMT signal count: got $(rpt.n_signal), expected ≈ $rank_true"
+@test abs(rpt.n_signal - rank_true) ≤ 3
 
 # Cleaned matrix should be better conditioned
 cond_orig  = cond(Symmetric(Σ))
 cond_clean = cond(Σ_clean)
-@test cond_clean < cond_orig "Cleaning should reduce condition number"
+@test cond_clean < cond_orig
 
 # Trace ratio should be close to 1 with :shrink_trace_preserving
-@test abs(rpt.trace_ratio - 1.0) < 0.1 "Trace not approximately preserved: ratio=$(rpt.trace_ratio)"
+@test abs(rpt.trace_ratio - 1.0) < 0.1
 
 # Cleaned matrix must be PSD
-@test rpt.positive_definite "Cleaned covariance is not positive definite"
+@test rpt.positive_definite
 end
 
 # =============================================================================
@@ -114,12 +122,12 @@ X   = randn(n, p)   # pure noise
 Σ   = cor(X)        # correlation matrix: true σ² = 1
 ev  = eigvals(Symmetric(Σ))
 σ2  = estimate_sigma2_from_bulk(ev, p, n; method=:iterative)
-@test abs(σ2 - 1.0) < 0.25 "σ² estimate off for pure noise: got $σ2, expected ≈ 1.0"
+@test abs(σ2 - 1.0) < 0.25
 
 # KS test should accept the MP fit for pure noise
 mp_fit = fit_mp_to_spectrum(ev, p, n)
-@test mp_fit.good_fit "KS test rejects MP for pure noise — algorithm issue"
-@test mp_fit.n_signal == 0 || mp_fit.n_signal ≤ 3 "False positives in pure noise: $(mp_fit.n_signal) signal"
+@test mp_fit.good_fit
+@test mp_fit.n_signal == 0 || mp_fit.n_signal ≤ 3
 end
 
 # =============================================================================
@@ -135,13 +143,13 @@ X_stable = randn(n, p) * 0.1
 for t in 1:n; X_stable[t, :] .+= 5.0*randn()*v_true; end
 
 cos_stable = rolling_eigenvector_stability(X_stable, window; n_components=1)
-@test cos_stable[1] > 0.7 "Stable factor not detected: cos=$(round(cos_stable[1],digits=3))"
+@test cos_stable[1] > 0.7
 
 # Unstable: random direction each window
 X_noisy = randn(n, p)
 # Don't test a hard threshold — just check instability < stability
 cos_noisy = rolling_eigenvector_stability(X_noisy, window; n_components=1)
-@test cos_noisy[1] ≤ cos_stable[1] "Unstable should have lower cosine than stable"
+@test cos_noisy[1] ≤ cos_stable[1]
 end
 
 # =============================================================================
@@ -163,17 +171,17 @@ fitted = _fit_gaussian_hmm_simple(obs, k)
 val    = validate_hmm_economics(fitted.state_sequence, obs, cfg)
 
 # Validation should pass (3 distinct regimes with reasonable separation)
-@test isempty(val.issues) || length(val.issues) ≤ 1 "HMM validation failed: $(val.issues)"
+@test isempty(val.issues) || length(val.issues) ≤ 1
 
 # Volatility separation: σ_true spans 0.008 to 0.060 — should be detectable
 v_fit = [std(obs[fitted.state_sequence .== j]) for j in 1:k
          if count(fitted.state_sequence .== j) > 0]
 length(v_fit) ≥ 2 &&
-    @test maximum(v_fit)/minimum(v_fit) > 2.0 "Vol separation not recovered (ratio=$(round(maximum(v_fit)/minimum(v_fit),digits=2)))"
+    @test maximum(v_fit)/minimum(v_fit) > 2.0
 
 # select_n_regimes should prefer k=3 over k=2 for this data
 best_k, sc = select_n_regimes(obs, 5; min_duration=15)
-@test best_k ∈ [2, 3, 4] "select_n_regimes returned $best_k — plausible but check"
+@test best_k ∈ [2, 3, 4]
 end
 
 # =============================================================================
@@ -182,14 +190,14 @@ end
 k = 3
 A = rand(k, k)
 constrain_transition_matrix!(A, Ergodic(; min_off_diag=0.02))
-@test all(A .≥ 0.02 - 1e-12) "Ergodic constraint violated: min=$(minimum(A))"
-@test all(abs.(sum(A, dims=2) .- 1.0) .< 1e-10) "Rows don't sum to 1 after Ergodic"
+@test all(A .≥ 0.02 - 1e-12)
+@test all(abs.(sum(A, dims=2) .- 1.0) .< 1e-10)
 
 # Absorbing: state 3 should be absorbing (or near-absorbing)
 A2 = rand(k, k)
 constrain_transition_matrix!(A2, Absorbing([3]; allow_escape=false))
-@test abs(A2[3, 3] - 1.0) < 1e-10 "Absorbing state 3 not locked: A[3,3]=$(A2[3,3])"
-@test all(abs.(A2[3, 1:2]) .< 1e-10) "Absorbing state 3 has escape probability"
+@test abs(A2[3, 3] - 1.0) < 1e-10
+@test all(abs.(A2[3, 1:2]) .< 1e-10)
 end
 
 # =============================================================================
@@ -217,18 +225,18 @@ L_fin, S_fin, conv_fin, _ = rpca_admm(X, best_λ)
 val_fin = validate_rpca_decomposition(L_fin, S_fin, X)
 
 # Both should converge
-@test conv_def "Default λ ADMM did not converge"
-@test conv_fin "Finance-tuned λ ADMM did not converge"
+@test conv_def
+@test conv_fin
 
 # Finance-tuned rank should not exceed 5 (finance-specific constraint)
-@test val_fin.rank_L ≤ 8 "rank(L) too high after finance tuning: $(val_fin.rank_L)"
+@test val_fin.rank_L ≤ 8
 
 # Reconstruction errors should be low (signal dominates)
-@test val_def.reconstruction_error < 0.4 "Default λ reconstruction error too high"
-@test val_fin.reconstruction_error < 0.4 "Finance λ reconstruction error too high"
+@test val_def.reconstruction_error < 0.4
+@test val_fin.reconstruction_error < 0.4
 
 # Sparse density: S should be sparse
-@test val_fin.sparse_density < 0.5 "S is not sparse with finance-tuned λ: density=$(round(val_fin.sparse_density,digits=3))"
+@test val_fin.sparse_density < 0.5
 end
 
 # =============================================================================
@@ -246,7 +254,7 @@ r2 = validate_rpca_decomposition(L, S, X; corr_ls_threshold=0.3)
 # Relaxed should never have MORE issues than strict
 corr_issues_strict  = count(contains.(r1.issues, "cor(L,S)"))
 corr_issues_relaxed = count(contains.(r2.issues, "cor(L,S)"))
-@test corr_issues_relaxed ≤ corr_issues_strict "Relaxed threshold should not add issues"
+@test corr_issues_relaxed ≤ corr_issues_strict
 end
 
 # =============================================================================
@@ -266,10 +274,10 @@ embargo_derived = compute_embargo_from_autocorr(y; method=:crossing_time, thresh
 splits_derived  = generate_purged_splits(n, embargo_derived; n_folds=5)
 leak_derived    = detect_information_leak(y, splits_derived)
 
-@test embargo_derived ≥ 3 "AR(1) φ=0.7 should need embargo ≥ 3 lags"
+@test embargo_derived ≥ 3
 
 # Derived embargo should have lower leakage than embargo=1
-@test leak_derived.max_leakage ≤ leak_short.max_leakage + 0.05 "Derived embargo did not reduce leakage"
+@test leak_derived.max_leakage ≤ leak_short.max_leakage + 0.05
 end
 
 # =============================================================================
@@ -281,15 +289,15 @@ e_cross = compute_embargo_from_autocorr(y; method=:crossing_time)
 e_decay = compute_embargo_from_autocorr(y; method=:decorrelation)
 
 # Both should be positive and bounded
-@test e_cross ≥ 1 "crossing_time embargo must be ≥ 1"
-@test e_decay ≥ 1 "decorrelation embargo must be ≥ 1"
-@test e_cross ≤ n÷4 "crossing_time embargo unreasonably large"
-@test e_decay ≤ n÷4 "decorrelation embargo unreasonably large"
+@test e_cross ≥ 1
+@test e_decay ≥ 1
+@test e_cross ≤ n÷4
+@test e_decay ≤ n÷4
 
 # For AR(1) φ=0.5, true decorrelation time ≈ -1/log(0.5) ≈ 1.4 lags
 # Both methods should give sensible estimates (roughly 2-15)
-@test 2 ≤ e_cross ≤ 20 "crossing_time out of expected range for AR(1) φ=0.5: $e_cross"
-@test 1 ≤ e_decay ≤ 20 "decorrelation out of expected range for AR(1) φ=0.5: $e_decay"
+@test 2 ≤ e_cross ≤ 20
+@test 1 ≤ e_decay ≤ 20
 end
 
 # =============================================================================
@@ -299,18 +307,18 @@ n = 100; n_folds = 5; large_embargo = 30   # fold_size=20, embargo=30 > 10
 splits = generate_purged_splits(n, large_embargo; n_folds=n_folds)
 
 # Should still produce some splits (not zero)
-@test length(splits) > 0 "No splits generated after auto-reduction"
+@test length(splits) > 0
 
 # Every split should have non-empty train and test
 for sp in splits
-    @test length(sp.train) ≥ 2 "Train set too small in fold $(sp.fold)"
-    @test length(sp.test)  ≥ 1 "Test set empty in fold $(sp.fold)"
+    @test length(sp.train) ≥ 2
+    @test length(sp.test)  ≥ 1
 end
 
 # No temporal leakage: train indices should all precede or follow test
 for sp in splits
     # Training and test should be disjoint
-    @test isempty(intersect(sp.train, sp.test)) "Train/test overlap in fold $(sp.fold)"
+    @test isempty(intersect(sp.train, sp.test))
 end
 end
 
@@ -320,12 +328,12 @@ end
 # should flag the conflict.
 conflicts = cross_model_audit([:rmt, :hmm];
                                data_evidence=Set{Symbol}([:autocorrelated_returns]))
-@test !isempty(conflicts) "Autocorrelated data should conflict with RMT :iid_returns assumption"
+@test !isempty(conflicts)
 
 # No data evidence → only structural model-model conflicts reported
 conflicts_clean = cross_model_audit([:rmt, :hmm])
 # HMM (stationary_transitions) and RMT (iid) don't structurally conflict by default
-@test length(conflicts_clean) ≤ length(conflicts) "Adding data evidence should not reduce conflicts"
+@test length(conflicts_clean) ≤ length(conflicts)
 end
 
 # =============================================================================
@@ -344,8 +352,8 @@ score_heter = StructuralStatistics._economic_score(states_heter, y_heter, k, 20)
 states_rand = [rand(1:k) for _ in 1:n]
 score_rand  = StructuralStatistics._economic_score(states_rand, y_heter, k, 20)
 
-@test score_heter ≥ 0.0 "Economic score must be non-negative"
-@test score_heter ≤ 1.0 "Economic score must be ≤ 1.0"
+@test score_heter ≥ 0.0
+@test score_heter ≤ 1.0
 end
 
 # =============================================================================
@@ -355,7 +363,7 @@ n = 300; y = simulate_ar1(0.3, 0.05, n)
 # Should not throw — that was the v1 bug
 @test_nowarn begin
     best_k, sc = select_n_regimes(y, 4; min_duration=15)
-    @test best_k ∈ 2:4 "best_k=$best_k out of search range"
+    @test best_k ∈ 2:4
 end
 end
 
