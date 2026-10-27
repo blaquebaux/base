@@ -133,14 +133,35 @@ function _chi2_sf(x::Float64, df::Int)
         z = ((x/df)^(1/3) - (1 - 2/(9df))) / sqrt(2/(9df))
         return 0.5*erfc(z/sqrt(2))
     end
-    # Regularized upper incomplete gamma via series
+    # Regularized upper incomplete gamma Q(a, xi) = chi-square survival.
+    # Series for P when xi < a+1, continued fraction for Q otherwise (Numerical
+    # Recipes gammp/gammq). The earlier single-series form was off by a factor of
+    # `a` (it dropped the 1/Γ(a+1) normalization) and truncated too early, so it
+    # collapsed to 0 (small x) or 1 (large x) for every df != 2.
     a = df/2.0; xi = x/2.0
-    t = s = 1.0
-    for n in 1:200
-        t *= xi/(a+n); s += t
-        abs(t) < abs(s)*1e-12 && break
+    logpref = -xi + a*log(xi) - _loggamma(a)        # log(xi^a e^{-xi} / Γ(a))
+    if xi < a + 1
+        ap = a; term = 1.0/a; ssum = term
+        for _ in 1:1000
+            ap += 1.0; term *= xi/ap; ssum += term
+            abs(term) < abs(ssum)*1e-15 && break
+        end
+        P = ssum * exp(logpref)                     # regularized lower gamma
+        return max(0.0, min(1.0, 1.0 - P))
+    else
+        tiny = 1e-300
+        b = xi + 1.0 - a; c = 1.0/tiny; d = 1.0/b; h = d
+        for i in 1:1000
+            an = -i*(i - a)
+            b += 2.0
+            d = an*d + b; abs(d) < tiny && (d = tiny)
+            c = b + an/c; abs(c) < tiny && (c = tiny)
+            d = 1.0/d; del = d*c; h *= del
+            abs(del - 1.0) < 1e-15 && break
+        end
+        Q = exp(logpref) * h                        # regularized upper gamma
+        return max(0.0, min(1.0, Q))
     end
-    max(0.0, min(1.0, 1.0 - s*exp(-xi + a*log(xi) - _loggamma(a))))
 end
 
 # =============================================================================
@@ -289,7 +310,9 @@ function fit_pca(X::AbstractMatrix{Float64}, config::PCAConfig=PCAConfig())
     Xs = config.standardize ? (X .- μ') ./ σ' : X .- μ'
 
     # SVD (numerically superior to eigendecomp of cov for small n)
-    U, sv, Vt = svd(Xs; full=false)
+    # NB: Julia's `svd` destructures to (U, S, V) — the third factor is V, NOT Vᵀ
+    # as in LAPACK/NumPy. The loadings are therefore V[:, 1:k] directly.
+    U, sv, V = svd(Xs; full=false)
     sv  = max.(sv, 0.0)
     ev  = sv.^2 ./ (n-1)         # eigenvalues of cov matrix
     exp_var = sv.^2 ./ sum(sv.^2)
@@ -312,7 +335,7 @@ function fit_pca(X::AbstractMatrix{Float64}, config::PCAConfig=PCAConfig())
     end
 
     # Post-fit validation
-    loadings   = Vt'[:, 1:k]
+    loadings   = V[:, 1:k]
     scores_mat = U[:, 1:k] .* sv[1:k]'
     Xr         = scores_mat * loadings' .* σ' .+ μ'
     recon_err  = norm(X - Xr, 2) / (norm(X, 2) + 1e-10)
@@ -430,14 +453,31 @@ end
 
 """
     _numerical_grad(f, θ; h) → gradient vector
-Adaptive finite-difference gradient.
+
+Feasibility-aware finite-difference gradient. The step is scaled relative to each
+coordinate so it never dwarfs a tiny parameter (e.g. ω≈1e-8). When a perturbed
+point is infeasible (f returns Inf/NaN, as the GARCH objective does outside its
+constraint set) the one-sided difference from the base point is used instead; if
+both sides are infeasible the component is 0. This stops an Inf across the
+constraint barrier from turning into an Inf/NaN step that corrupts θ.
 """
 function _numerical_grad(f::Function, θ::Vector{Float64}; h::Float64=1e-6)
-    g = similar(θ)
+    g  = similar(θ)
+    f0 = f(θ)
     for i in eachindex(θ)
-        θp = copy(θ); θp[i] += h
-        θm = copy(θ); θm[i] -= h
-        g[i] = (f(θp) - f(θm)) / (2h)
+        hi = max(h, 1e-6 * abs(θ[i]))
+        θp = copy(θ); θp[i] += hi
+        θm = copy(θ); θm[i] -= hi
+        fp = f(θp); fm = f(θm)
+        if isfinite(fp) && isfinite(fm)
+            g[i] = (fp - fm) / (2hi)
+        elseif isfinite(fp) && isfinite(f0)
+            g[i] = (fp - f0) / hi
+        elseif isfinite(fm) && isfinite(f0)
+            g[i] = (f0 - fm) / hi
+        else
+            g[i] = 0.0
+        end
     end
     g
 end
@@ -459,32 +499,60 @@ function fit_garch(r::AbstractVector{Float64}, config::GARCHConfig=GARCHConfig()
     T     = length(rc)
     σ²_s  = var(rc, corrected=true)
 
-    # Method-of-moments warm start
-    ω₀, α₀, β₀ = σ²_s*0.05, 0.05, 0.90
-    θ = [ω₀, α₀, β₀]
-
-    obj(θ_) = begin
-        ω_, α_, β_ = θ_
-        (ω_ ≤ 0 || α_ < 0 || β_ < 0 || α_+β_ ≥ 1) && return Inf
-        -_garch_loglik(ω_, α_, β_, rc)[1]
+    # GARCH(1,1) MLE by variance targeting: fix ω = σ²_s·(1 − α − β) so the model's
+    # unconditional variance equals the sample variance, then search the (α, β)
+    # stationarity simplex — a coarse grid to localize, coordinate ascent with a
+    # shrinking step to refine. This replaces a fixed-step projected gradient descent
+    # that was scale-blind (ω≈1e-4 vs α,β≈1) and diverged (ω→1e4, α=β=0).
+    ll_at(α_, β_) = begin
+        (α_ < 0 || β_ < 0 || α_ + β_ ≥ 0.9999) && return -Inf
+        ω_ = σ²_s * (1 - α_ - β_)
+        ω_ ≤ 0 && return -Inf
+        _garch_loglik(ω_, α_, β_, rc)[1]
     end
 
-    lr = config.lr0
-    for iter in 1:config.max_iter
-        g  = _numerical_grad(obj, θ)
-        θ .-= lr .* g
-        # Project onto constraint set
-        θ[1] = max(θ[1], 1e-8)
-        θ[2] = max(θ[2], 0.0)
-        θ[3] = max(θ[3], 0.0)
-        s = θ[2] + θ[3]
-        if s ≥ 0.9999
-            θ[2] *= 0.9999/s; θ[3] *= 0.9999/s
+    best_α, best_β, best_ll = 0.0, 0.0, ll_at(0.0, 0.0)
+    for α_ in 0.0:0.02:0.40, β_ in 0.0:0.02:0.98
+        l = ll_at(α_, β_)
+        l > best_ll && ((best_α, best_β, best_ll) = (α_, β_, l))
+    end
+    step = 0.02
+    for _ in 1:500
+        improved = false
+        for (dα, dβ) in ((step, 0.0), (-step, 0.0), (0.0, step), (0.0, -step))
+            l = ll_at(best_α + dα, best_β + dβ)
+            if l > best_ll
+                best_α, best_β, best_ll = best_α + dα, best_β + dβ, l
+                improved = true
+            end
         end
-        lr *= config.lr_decay
+        improved || (step /= 2)
+        step < 1e-6 && break
     end
 
-    ω, α, β    = θ
+    α, β = best_α, best_β
+    ω    = σ²_s * (1 - α - β)
+
+    # Free-ω polish: coordinate ascent on all three parameters, starting from the
+    # variance-targeting optimum, to remove the small bias that tying ω to the
+    # sample variance introduces.
+    llf(ω_, α_, β_) = (ω_ > 0 && α_ ≥ 0 && β_ ≥ 0 && α_ + β_ < 0.9999) ?
+                      _garch_loglik(ω_, α_, β_, rc)[1] : -Inf
+    cur_ll = llf(ω, α, β)
+    sω, sαβ = max(ω * 0.5, 1e-9), 0.01
+    for _ in 1:1000
+        improved = false
+        for (dω, dα, dβ) in ((sω,0.0,0.0), (-sω,0.0,0.0), (0.0,sαβ,0.0),
+                             (0.0,-sαβ,0.0), (0.0,0.0,sαβ), (0.0,0.0,-sαβ))
+            l = llf(ω + dω, α + dα, β + dβ)
+            if l > cur_ll
+                ω, α, β, cur_ll = ω + dω, α + dα, β + dβ, l
+                improved = true
+            end
+        end
+        improved || (sω /= 2; sαβ /= 2)
+        sαβ < 1e-6 && break
+    end
     ll, σ²     = _garch_loglik(ω, α, β, rc)
     std_r      = rc ./ sqrt.(σ²)
     aic = -2ll + 6; bic = -2ll + 3*log(T)
@@ -636,7 +704,7 @@ function fit_var(Y::AbstractMatrix{Float64}, config::VARConfig=VARConfig())
             lag*k^2 + k ≥ T-lag && continue
             Z, Yout = _build_var_regressor(Y, lag)
             Teff = size(Yout, 1)
-            Q, R = qr(Z); B_lag = R \ (Q' * Yout)
+            B_lag = Z \ Yout                     # least-squares OLS (QR under the hood)
             E_lag = Yout - Z*B_lag
             Σ_lag = E_lag'E_lag ./ Teff
             !isposdef(Σ_lag) && continue
@@ -660,7 +728,7 @@ function fit_var(Y::AbstractMatrix{Float64}, config::VARConfig=VARConfig())
         ZtZ = Z'Z + config.ridge_lambda * I(size(Z,2))
         B   = ZtZ \ (Z' * Yout)
     else
-        Q, R_ = qr(Z); B = R_ \ (Q' * Yout)
+        B = Z \ Yout                            # least-squares OLS (QR under the hood)
     end
     E  = Yout - Z*B
     Σ  = Symmetric(E'E ./ Teff)
@@ -740,18 +808,20 @@ function granger_causality_var(Y::AbstractMatrix{Float64}, config::VARConfig,
     # Restricted OLS (set those columns to zero via column deletion)
     free_cols = setdiff(1:size(Z,2), restrict_cols)
     Zr     = Z[:, free_cols]
-    Qr, Rr = qr(Zr); Br = Rr \ (Qr' * Yout[:, effect_idx])
+    Br     = Zr \ Yout[:, effect_idx]          # least-squares OLS (QR under the hood)
     Er     = Yout[:, effect_idx] - Zr*Br
     SSEr   = sum(Er.^2)
 
-    Qu, Ru = qr(Z); Bu = Ru \ (Qu' * Yout[:, effect_idx])
+    Bu     = Z \ Yout[:, effect_idx]           # least-squares OLS (QR under the hood)
     Eu     = Yout[:, effect_idx] - Z*Bu
     SSEu   = sum(Eu.^2)
 
     q       = length(restrict_cols) * length(effect_idx)
     dfr     = Teff - size(Z,2)
     F_stat  = max(0.0, (SSEr - SSEu)/q / (SSEu/dfr))
-    p_val   = 1 - _betai(dfr/(dfr + q*F_stat), dfr/2, q/2)
+    # Upper-tail F p-value: P(F > f) = I_{d2/(d2+d1 f)}(d2/2, d1/2). The earlier
+    # form used 1 - I_x(...), which is the lower tail, so it never rejected.
+    p_val   = _betai(dfr/(dfr + q*F_stat), dfr/2, q/2)
 
     (F=F_stat, df1=q, df2=dfr, p_value=p_val,
      reject=p_val < 0.05,
@@ -966,7 +1036,7 @@ function sample_tcopula(result::TCopulaResult, n_samples::Int)
 
     for i in 1:n_samples
         Z  = L * randn(d)
-        W  = sum(randn(ν_int)^2 for _ in 1:ν_int) / ν
+        W  = sum(randn()^2 for _ in 1:ν_int) / ν   # χ²(ν_int) = Σ of ν_int squared normals
         X  = Z ./ sqrt(W)
         samples[i, :] = [_t_cdf(x, ν) for x in X]
     end

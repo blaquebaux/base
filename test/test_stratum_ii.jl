@@ -18,7 +18,7 @@ using .StructuralStatistics: select_n_regimes, StudentTEmission, HMMConfig,
     constrain_transition_matrix!, cross_model_audit, compute_embargo_from_autocorr,
     generate_purged_splits, rpca_admm, fit_mp_to_spectrum, Ergodic, Absorbing,
     validate_rpca_decomposition, detect_information_leak, run_stratum_ii_audit,
-    tune_lambda_rpca, validate_hmm_economics
+    tune_lambda_rpca, validate_hmm_economics, _fit_gaussian_hmm_simple, _economic_score
 using LinearAlgebra, Statistics, Random, Test
 
 Random.seed!(2025)
@@ -40,12 +40,12 @@ function simulate_gaussian_hmm(A::AbstractMatrix, μ::AbstractVector,
     π₀ = fill(1.0/k, k)   # uniform initial
     states = zeros(Int, n); obs = zeros(n)
 
-    # Draw initial state
-    states[1] = rand(Categorical_sample(π₀))
+    # Draw initial state (Categorical_sample already returns the drawn index)
+    states[1] = Categorical_sample(π₀)
     obs[1]    = μ[states[1]] + σ[states[1]]*randn()
 
     for t in 2:n
-        states[t] = rand(Categorical_sample(A[states[t-1], :]))
+        states[t] = Categorical_sample(A[states[t-1], :])
         obs[t]    = μ[states[t]] + σ[states[t]]*randn()
     end
     states, obs
