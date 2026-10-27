@@ -419,6 +419,8 @@ struct Absorbing        <: TransitionConstraint; states::Vector{Int}; allow_esca
 struct BlockedErgodic   <: TransitionConstraint; forbidden::Set{Tuple{Int,Int}} end
 
 Ergodic(; min_off_diag::Float64=0.01) = Ergodic(min_off_diag)
+Absorbing(states::AbstractVector{<:Integer}; allow_escape::Bool=false) =
+    Absorbing(collect(Int, states), allow_escape)
 
 abstract type EmissionModel end
 struct GaussianEmission    <: EmissionModel; regime_specific_cov::Bool end
@@ -804,9 +806,11 @@ function rpca_admm(X::AbstractMatrix{Float64}, λ::Float64;
 
     for k in 1:max_iter
         iter = k
-        # L update: nuclear norm prox
-        U, σ, Vt = svd(X - S + Y/μ; full=false)
-        L  = U * Diagonal(max.(σ .- 1/μ, 0)) * Vt
+        # L update: nuclear norm prox. NB: Julia's `svd` returns V (not Vᵀ) as the
+        # third factor, so the reconstruction is U·Σ·V'. The earlier `U*Σ*Vt` form
+        # silently transposed the factor on tall inputs and errored on wide folds.
+        U, σ, V = svd(X - S + Y/μ; full=false)
+        L  = U * Diagonal(max.(σ .- 1/μ, 0)) * V'
 
         # S update: ℓ1 prox
         tmp = X - L + Y/μ
@@ -848,10 +852,11 @@ function financial_rpca_loss(X_train::AbstractMatrix, X_test::AbstractMatrix,
     sparse_density = sum(abs.(S_test) .> 1e-10) / length(S_test)
     sparsity_pen   = abs(sparse_density - 0.02)
 
-    # 3. Rolling stability of L
-    m, p  = size(L_test); W = max(10, m÷4)
-    drifts = [frobenius(L_test[i:min(i+W-1,m),:] .- L_test[max(1,i-W):i,:])
-              for i in W:W:m-1]
+    # 3. Rolling stability of L: drift between consecutive equal-width blocks.
+    # (Comparing a forward window to a backward window gave unequal-length slices.)
+    m, p  = size(L_test); W = max(10, m÷4); nb = m ÷ W
+    drifts = [frobenius(L_test[(b-1)*W+1 : b*W, :] .- L_test[b*W+1 : (b+1)*W, :])
+              for b in 1:(nb-1)]
     stability = isempty(drifts) ? 0.0 : mean(drifts) / (norm_Xt + 1e-10)
 
     recon + sparsity_weight*sparsity_pen + stability_weight*stability
@@ -976,9 +981,18 @@ function compute_embargo_from_autocorr(returns::AbstractVector{Float64};
         return nl
 
     elseif method == :decorrelation
-        cumacf = cumsum(acf); peak = cumacf[end]
-        idx    = findfirst(cumacf .≥ peak*(1 - 1/exp(1.0)))
-        return something(idx, nl)
+        # Integrate only the coherent part of the ACF: once |ρ| falls below the noise
+        # threshold, later lags are sampling noise and must not inflate the cumulative
+        # mass (summing |ρ| over all lags pushed the estimate to ≈0.63·max_lag for any
+        # series, e.g. 30 for an AR(1) whose true decorrelation time is ~1.4).
+        heff = nl
+        for h in 1:nl
+            if all(acf[h:min(h+3,nl)] .< threshold); heff = h; break; end
+        end
+        cumacf = cumsum(acf[1:heff]); peak = cumacf[end]
+        peak < 1e-12 && return 1
+        idx = findfirst(cumacf .≥ peak*(1 - 1/exp(1.0)))
+        return something(idx, heff)
     else
         error("Unknown method :$method. Choose :crossing_time or :decorrelation.")
     end
