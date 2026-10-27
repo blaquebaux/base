@@ -10,6 +10,9 @@ include("../src/module_6_cascade/module_6_cascade.jl")
 include("../src/module_7_execution/module_7_execution.jl")
 
 using .DataIngestion, .SignalSmoothing, .ARMAGARCH, .DPM, .CascadeInterface, .ExecutionLayer
+using Statistics: mean, std
+# @enum members are not exported with the enum type.
+using .ExecutionLayer: NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH, EMERGENCY_LIQUIDATION
 
 @testset "Stress Tests & Edge Cases" begin
 
@@ -50,7 +53,7 @@ using .DataIngestion, .SignalSmoothing, .ARMAGARCH, .DPM, .CascadeInterface, .Ex
     @testset "Single Regime Persistence" begin
         returns = randn(100) .* 0.01 .+ 0.001
 
-        dpm_config = DPMConfig(3, 2.0, 0.5, 1e-3, 50)
+        dpm_config = DPMConfig(5, 2.0, 0.5, 1e-3, 50)   # source requires ≥5 components
         pf_config = ParticleFilterConfig(200, 0.5)
         model, _, _ = em_estimation(returns, dpm_config, pf_config, nothing)
 
