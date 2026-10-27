@@ -105,28 +105,29 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
     @testset "check_emergency_liquidation - Normal" begin
         cb = CircuitBreakerStateMachine()
         should_liq, new_cb = check_emergency_liquidation(
-            80.0, 20.0, 0.05, 0.02, cb
+            30.0, 20.0, 0.05, 0.02, cb   # VVIX/VIX = 1.5 < 2; envelope < 3× median
         )
 
         @test should_liq == false
         @test new_cb.state == NORMAL
     end
 
-    @testset "check_emergency_liquidation - VIX > 40" begin
+    @testset "check_emergency_liquidation - High VIX alone does not trigger" begin
+        # v2.0 spec removed the standalone VIX>40 trigger: only the VVIX/VIX ratio
+        # and the bootstrap envelope liquidate. High VIX with a sub-2 ratio is calm.
         cb = CircuitBreakerStateMachine()
         should_liq, new_cb = check_emergency_liquidation(
-            80.0, 45.0, 0.05, 0.02, cb
+            80.0, 45.0, 0.05, 0.02, cb   # ratio 1.78 < 2
         )
 
-        @test should_liq == true
-        @test new_cb.state == EMERGENCY_LIQUIDATION
-        @test new_cb.cooldown_until !== nothing
+        @test should_liq == false
+        @test new_cb.state == NORMAL
     end
 
     @testset "check_emergency_liquidation - VVIX Persistence (1 breach)" begin
         cb = CircuitBreakerStateMachine()
         should_liq, new_cb = check_emergency_liquidation(
-            125.0, 20.0, 0.05, 0.02, cb
+            125.0, 20.0, 0.05, 0.02, cb   # ratio 6.25 > 2
         )
 
         @test should_liq == false
@@ -157,7 +158,7 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
     @testset "check_emergency_liquidation - VVIX Recovery" begin
         cb = CircuitBreakerStateMachine()
         _, cb1 = check_emergency_liquidation(125.0, 20.0, 0.05, 0.02, cb)
-        should_liq, cb2 = check_emergency_liquidation(80.0, 20.0, 0.05, 0.02, cb1)
+        should_liq, cb2 = check_emergency_liquidation(30.0, 20.0, 0.05, 0.02, cb1)  # ratio 1.5 < 2
 
         @test should_liq == false
         @test cb2.vvix_breached_count == 0
@@ -167,7 +168,7 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
     @testset "check_emergency_liquidation - Bootstrap 3x" begin
         cb = CircuitBreakerStateMachine()
         should_liq, new_cb = check_emergency_liquidation(
-            80.0, 20.0, 0.15, 0.05, cb
+            30.0, 20.0, 0.16, 0.05, cb   # envelope 0.16 > 3×0.05; VVIX ratio 1.5 < 2
         )
 
         @test should_liq == true
@@ -177,22 +178,22 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
 
     @testset "check_emergency_liquidation - Multiple Triggers" begin
         cb = CircuitBreakerStateMachine()
-        # VIX > 40 AND bootstrap 3x
+        # VVIX/VIX ratio breach AND bootstrap envelope 3×: both call for liquidation.
         should_liq, new_cb = check_emergency_liquidation(
-            80.0, 45.0, 0.15, 0.05, cb
+            125.0, 20.0, 0.16, 0.05, cb
         )
 
         @test should_liq == true
-        @test new_cb.state == EMERGENCY_LIQUIDATION
+        @test new_cb.state == BOOTSTRAP_WATCH   # bootstrap trigger sets the final state
     end
 
     @testset "check_emergency_liquidation - Cooldown" begin
         cb = CircuitBreakerStateMachine()
-        _, cb1 = check_emergency_liquidation(80.0, 45.0, 0.05, 0.02, cb)
+        _, cb1 = check_emergency_liquidation(30.0, 20.0, 0.16, 0.05, cb)  # bootstrap → liquidate + cooldown
 
         # During cooldown, should not liquidate again
         should_liq, cb2 = check_emergency_liquidation(
-            80.0, 45.0, 0.05, 0.02, cb1
+            30.0, 20.0, 0.16, 0.05, cb1
         )
 
         @test should_liq == false
@@ -200,13 +201,13 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
 
     @testset "check_emergency_liquidation - Cooldown Expired" begin
         cb = CircuitBreakerStateMachine()
-        _, cb1 = check_emergency_liquidation(80.0, 45.0, 0.05, 0.02, cb)
+        _, cb1 = check_emergency_liquidation(30.0, 20.0, 0.16, 0.05, cb)
 
         # Manually expire cooldown
         cb1.cooldown_until = now(tz"America/New_York") - Minute(1)
 
         should_liq, cb2 = check_emergency_liquidation(
-            80.0, 45.0, 0.05, 0.02, cb1
+            30.0, 20.0, 0.16, 0.05, cb1
         )
 
         @test should_liq == true
@@ -297,7 +298,7 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
 
     @testset "apply_position_floor - Quantity" begin
         @test apply_position_floor(100, 450.0, 500.0) == 100
-        @test apply_position_floor(2, 450.0, 500.0) == 0  # 2 * 450 = 900 > 500
+        @test apply_position_floor(2, 450.0, 500.0) == 2  # 2 * 450 = 900 > 500, kept
         @test apply_position_floor(1, 450.0, 500.0) == 0  # 1 * 450 = 450 < 500
         @test apply_position_floor(-1, 450.0, 500.0) == 0
     end
@@ -327,8 +328,8 @@ using .ExecutionLayer: LIMIT, MARKET, NORMAL, VVIX_WATCH, BOOTSTRAP_WATCH,
     @testset "Emergency Liquidation Workflow" begin
         cb = CircuitBreakerStateMachine()
 
-        # Normal state
-        should_liq1, cb1 = check_emergency_liquidation(80.0, 20.0, 0.05, 0.02, cb)
+        # Normal state (VVIX/VIX ratio 1.5 < 2, no breach)
+        should_liq1, cb1 = check_emergency_liquidation(30.0, 20.0, 0.05, 0.02, cb)
         @test should_liq1 == false
 
         # VVIX breach
