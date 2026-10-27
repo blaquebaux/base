@@ -2,9 +2,12 @@ module TestDataIngestion
 
 using Test
 using Dates, TimeZones
+using Random   # MersenneTwister
 
 include("../src/module_1_data/module_1_data.jl")
 using .DataIngestion
+# Public API used by the tests but absent from the module `export` list.
+using .DataIngestion: assemble_market_state, DataFeed, DEFAULT_FEEDS
 
 @testset "DataIngestion Module - Comprehensive" begin
 

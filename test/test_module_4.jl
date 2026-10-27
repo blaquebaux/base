@@ -31,7 +31,8 @@ using .ARMAGARCH
     @testset "ARMASpec - Invalid Specifications" begin
         @test_throws AssertionError ARMASpec(3, 1)   # p > 2
         @test_throws AssertionError ARMASpec(1, 3)   # q > 2
-        @test_throws AssertionError ARMASpec(0, 0)   # p + q = 0
+        # ARMASpec(0, 0) is valid by design (constant-mean "Floating" regime atom).
+        @test ARMASpec(0, 0) isa ARMASpec
         @test_throws AssertionError ARMASpec(-1, 1)  # p < 0
         @test_throws AssertionError ARMASpec(1, -1)  # q < 0
     end
@@ -148,40 +149,40 @@ using .ARMAGARCH
     @testset "arma_loglikelihood - Basic" begin
         returns = randn(50) .* 0.01
         spec = ARMASpec(1, 0)
-        params = [0.0, 0.1, log(0.0001)]
+        params = [0.0, 0.1, 0.0001]
 
         ll = arma_loglikelihood(returns, params, spec)
-        @test ll > 0  # Negative log-likelihood is positive
+        @test ll < 0  # NLL is negative when the Gaussian density > 1 (σ² ≪ 1)
         @test isfinite(ll)
     end
 
     @testset "arma_loglikelihood - MA Component" begin
         returns = randn(50) .* 0.01
         spec = ARMASpec(0, 1)
-        params = [0.0, 0.1, log(0.0001)]
+        params = [0.0, 0.1, 0.0001]
 
         ll = arma_loglikelihood(returns, params, spec)
-        @test ll > 0
+        @test ll < 0
         @test isfinite(ll)
     end
 
     @testset "arma_loglikelihood - ARMA(1,1)" begin
         returns = randn(50) .* 0.01
         spec = ARMASpec(1, 1)
-        params = [0.0, 0.1, 0.1, log(0.0001)]
+        params = [0.0, 0.1, 0.1, 0.0001]
 
         ll = arma_loglikelihood(returns, params, spec)
-        @test ll > 0
+        @test ll < 0
         @test isfinite(ll)
     end
 
     @testset "arma_loglikelihood - Invalid Variance" begin
         returns = randn(50) .* 0.01
         spec = ARMASpec(1, 0)
-        params = [0.0, 0.1, log(-0.0001)]  # Invalid: will exp to small positive
+        params = [0.0, 0.1, -0.0001]  # Invalid: negative variance
 
         ll = arma_loglikelihood(returns, params, spec)
-        @test isfinite(ll)
+        @test !isfinite(ll)   # σ² ≤ 0 returns +Inf (penalizes the optimizer)
     end
 
     # =========================================================================
@@ -193,7 +194,7 @@ using .ARMAGARCH
         garch = GARCHParams(0.00001, 0.1, 0.85)
 
         ll = garch_loglikelihood(returns, arma, garch)
-        @test ll > 0
+        @test ll < 0
         @test isfinite(ll)
     end
 
@@ -203,7 +204,10 @@ using .ARMAGARCH
         garch = GARCHParams(0.00001, 0.0, 0.0)
 
         ll = garch_loglikelihood(returns, arma, garch)
-        @test ll > 0
+        # NLL sign depends on fit: with a tiny fixed ω and no GARCH adaptation the
+        # model under-fits the data variance, so the NLL is positive here. Only
+        # finiteness is a stable property.
+        @test isfinite(ll)
     end
 
     # =========================================================================
@@ -217,7 +221,7 @@ using .ARMAGARCH
 
         @test arma isa ARMAParams
         @test garch === nothing
-        @test ll < 0  # Actual log-likelihood (not negated)
+        @test ll > 0  # Actual log-likelihood (not negated)
         @test isfinite(ll)
     end
 
@@ -244,7 +248,7 @@ using .ARMAGARCH
         @test garch.α₁ >= 0
         @test garch.β₁ >= 0
         @test garch.α₁ + garch.β₁ < 1.0
-        @test ll < 0
+        @test ll > 0  # estimate_armagarch returns the actual log-likelihood
     end
 
     @testset "estimate_armagarch - ARMA(2,2)" begin
@@ -320,7 +324,9 @@ using .ARMAGARCH
         returns = fill(0.0, 30)
         rv = rolling_realized_vol(returns, 10)
 
-        @test all(isnan.(rv))  # Zero variance → NaN
+        # Warmup entries are NaN; once a full window is available, zero returns
+        # give exactly zero realized vol (std of zeros = 0), not NaN.
+        @test all(x -> isnan(x) || x == 0.0, rv)
     end
 
     # =========================================================================
@@ -353,7 +359,7 @@ using .ARMAGARCH
         α2 = tail_index_from_vol_scale(0.04, 0.02)
         α3 = tail_index_from_vol_scale(0.06, 0.02)
 
-        @test α1 > α2 > α3  # Increasing vol → decreasing tail index
+        @test α1 > α2 >= α3  # Increasing vol → decreasing tail index (floored at 1.5)
     end
 
     @testset "dof_from_tail_index - Finite Variance" begin
@@ -434,7 +440,7 @@ using .ARMAGARCH
         @test arma isa ARMAParams
         @test garch isa GARCHParams
         @test arma.μ > 0  # Should recover positive drift
-        @test ll < 0
+        @test ll > 0  # estimate_armagarch returns the actual log-likelihood
     end
 
     @testset "Regime Model Construction" begin

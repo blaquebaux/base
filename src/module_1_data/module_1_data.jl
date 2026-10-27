@@ -1,6 +1,7 @@
 module DataIngestion
 
 using Dates, DataFrames, HTTP, JSON3, CSV, TimeZones
+using Random   # MersenneTwister (deterministic synthetic feeds)
 
 export FeedConfig, Observation, MarketState,
        fetch_and_normalize, is_stale, count_stale_signals,

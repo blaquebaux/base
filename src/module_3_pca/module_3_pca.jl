@@ -52,6 +52,11 @@ function fit_vol_pca(data::VolSurfacePCA, n_components::Int=3)
     # Assemble data matrix: each row = observation, each column = variable
     X = hcat(data.vix, data.vxv, data.vvix, data.vix1d, data.iv_rank)
 
+    # Drop variables that are entirely unavailable (e.g. VIX1D), per the PC3 note,
+    # before dropping rows: an all-NaN column must not wipe out every observation.
+    present_cols = vec(.!all(isnan.(X), dims=1))
+    X = X[:, present_cols]
+
     # Remove rows with NaN
     valid_rows = .!any(isnan.(X), dims=2)[:]
     X_clean = X[valid_rows, :]'
@@ -295,8 +300,8 @@ end
 
 Z-score standardize each row (variable) of matrix X.
 """
-function _standardize(X::Matrix{Float64})::Matrix{Float64}
-    X_std = similar(X)
+function _standardize(X::AbstractMatrix{<:Real})::Matrix{Float64}
+    X_std = Matrix{Float64}(undef, size(X))
     for i in 1:size(X, 1)
         row = X[i, :]
         mu = mean(row)

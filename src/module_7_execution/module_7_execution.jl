@@ -1,6 +1,7 @@
 module ExecutionLayer
 
 using Dates, Sockets, Logging, TimeZones
+using Random   # randn (deterministic latency/jitter simulation)
 
 export OrderType, IBKROrder, CircuitBreakerState, CircuitBreakerStateMachine,
        check_emergency_liquidation, send_order, cancel_order,

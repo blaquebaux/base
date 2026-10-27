@@ -67,7 +67,7 @@ using .PCACompression
     end
 
     @testset "fit_vol_pca - Insufficient Data" begin
-        n = 5
+        n = 2   # fewer observations than n_components (3) must trip the assertion
         data = VolSurfacePCA(
             rand(n) .* 10 .+ 15,
             rand(n) .* 8 .+ 18,
@@ -245,7 +245,7 @@ using .PCACompression
         n = 50
         vol_pcs = (randn(n), randn(n), randn(n))
         yield_factors = (rand(n) .* 2 .+ 3, rand(n) .* 1 .- 0.5, rand(n) .* 0.5)
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:n]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:n]
 
         states = assemble_state_vector(vol_pcs, yield_factors, true, timestamps)
 
@@ -259,7 +259,7 @@ using .PCACompression
         n = 10
         vol_pcs = (randn(n), randn(n), randn(n))
         yield_factors = (rand(n), rand(n), rand(n))
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:n]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:n]
 
         states = assemble_state_vector(vol_pcs, yield_factors, false, timestamps)
 
@@ -271,7 +271,7 @@ using .PCACompression
     @testset "assemble_state_vector - Length Validation" begin
         vol_pcs = (randn(10), randn(10), randn(10))
         yield_factors = (randn(8), randn(8), randn(8))  # Mismatched length
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:10]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:10]
 
         @test_throws AssertionError assemble_state_vector(vol_pcs, yield_factors, true, timestamps)
     end
@@ -279,7 +279,7 @@ using .PCACompression
     @testset "assemble_state_vector - Timestamp Validation" begin
         vol_pcs = (randn(10), randn(10), randn(10))
         yield_factors = (randn(10), randn(10), randn(10))
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:8]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:8]
 
         @test_throws AssertionError assemble_state_vector(vol_pcs, yield_factors, true, timestamps)
     end
@@ -337,7 +337,7 @@ using .PCACompression
         level, slope, curvature = litterman_scheinkman_factors(yc)
 
         # Assemble state vectors
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:n]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:n]
         states = assemble_state_vector((pc1, pc2, pc3), (level, slope, curvature), true, timestamps)
 
         @test length(states) == n
@@ -364,7 +364,7 @@ using .PCACompression
         yc = YieldCurve(maturities, yields)
         level, slope, curvature = litterman_scheinkman_factors(yc)
 
-        timestamps = [ZonedDateTime(DateTime(2024, 1, i+1, 16, 0), tz"America/New_York") for i in 1:n]
+        timestamps = [ZonedDateTime(DateTime(2024, 1, 1, 16, 0) + Day(i), tz"America/New_York") for i in 1:n]
         states = assemble_state_vector((pc1, pc2, pc3), (level, slope, curvature), false, timestamps)
 
         @test all(isnan.(getfield.(states, :vol_pc3)))

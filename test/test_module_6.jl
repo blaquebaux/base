@@ -4,6 +4,7 @@ using Test
 
 include("../src/module_6_cascade/module_6_cascade.jl")
 using .CascadeInterface
+using .CascadeInterface: create_gamma_arma_output
 
 @testset "CascadeInterface Module - Comprehensive" begin
 
@@ -36,7 +37,7 @@ using .CascadeInterface
 
     @testset "RegimeProbs - Invalid" begin
         @test_throws AssertionError RegimeProbs(0.5, 0.5, 0.5)    # Sum > 1
-        @test_throws AssertionError RegimeProbs(0.5, 0.5, 0.0)    # Sum < 1
+        @test_throws AssertionError RegimeProbs(0.3, 0.3, 0.3)    # Sum < 1 (0.9)
         @test_throws AssertionError RegimeProbs(-0.1, 0.6, 0.5)   # Negative
         @test_throws AssertionError RegimeProbs([0.5, 0.5])       # Wrong length
     end

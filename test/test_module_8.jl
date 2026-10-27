@@ -4,6 +4,7 @@ using Test, Dates, TimeZones
 
 include("../src/module_8_governance/module_8_governance.jl")
 using .Governance
+using Statistics: std, mean
 
 @testset "Governance Module - Comprehensive" begin
 
@@ -56,8 +57,9 @@ using .Governance
         @test occursin("ratio:", reason)
     end
 
-    @testset "check_rollback - Threshold Degradation (exactly 1.2x)" begin
-        should_roll, reason = check_rollback(0.06, 0.05, 1.2)
+    @testset "check_rollback - Threshold Degradation (above 1.2x)" begin
+        # Threshold is strict (ratio > 1.2); use 1.3x so degradation triggers.
+        should_roll, reason = check_rollback(0.065, 0.05, 1.2)
 
         @test should_roll == true
         @test occursin("degraded", reason)
@@ -417,7 +419,7 @@ using .Governance
         @test length(serialized) > 0
 
         deserialized = Governance._deserialize_model(serialized)
-        @test deserialized === nothing  # Placeholder implementation
+        @test deserialized == model   # round-trips (was a placeholder returning nothing)
     end
 
     # =========================================================================

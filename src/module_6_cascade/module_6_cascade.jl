@@ -27,6 +27,7 @@ struct RegimeProbs
     function RegimeProbs(p_fixed::Float64, p_growth::Float64, p_floating::Float64)
         total = p_fixed + p_growth + p_floating
         @assert abs(total - 1.0) < 1e-6 "Regime probabilities must sum to 1.0 (got $total)"
+        @assert p_fixed >= -1e-9 && p_growth >= -1e-9 && p_floating >= -1e-9 "Regime probabilities must be non-negative"
         new(p_fixed, p_growth, p_floating)
     end
 end

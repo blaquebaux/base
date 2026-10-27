@@ -5,6 +5,13 @@ using Test
 include("../src/module_5_dpm/module_5_dpm.jl")
 using .DPM
 
+# DPM atoms are duck-typed (Vector{Any}); the recursive/likelihood paths need a
+# real RegimeModel (with .arma_params), not a `nothing` placeholder.
+include("../src/module_4_arma/module_4_arma.jl")
+using .ARMAGARCH: RegimeModel, ARMAParams, ARMASpec
+_mk_atom() = RegimeModel(ARMASpec(1, 0), ARMAParams(0.0, [0.1], Float64[], 0.0001),
+                         nothing, 2.0, nothing, 1.0)
+
 @testset "DPM Module - Comprehensive" begin
 
     # =========================================================================
@@ -39,7 +46,7 @@ using .DPM
     # =========================================================================
     @testset "StickBreaking - Basic" begin
         weights = [0.4, 0.35, 0.25]
-        atoms = [Dict(:μ => 0.0), Dict(:μ => 0.01), Dict(:μ => -0.01)]
+        atoms = Any[Dict(:μ => 0.0), Dict(:μ => 0.01), Dict(:μ => -0.01)]
         sb = StickBreaking(weights, atoms)
 
         @test length(sb.weights) == 3
@@ -57,7 +64,7 @@ using .DPM
 
     @testset "StickBreaking - Single Component" begin
         weights = [1.0]
-        atoms = [Dict(:μ => 0.0)]
+        atoms = Any[Dict(:μ => 0.0)]
         sb = StickBreaking(weights, atoms)
 
         @test sb.weights[1] ≈ 1.0
@@ -90,7 +97,7 @@ using .DPM
     @testset "particle_filter_estep - Basic" begin
         returns = randn(50) .* 0.01
         weights = [0.4, 0.35, 0.25]
-        atoms = [Dict(:μ => 0.0, :σ² => 0.0001), 
+        atoms = Any[Dict(:μ => 0.0, :σ² => 0.0001), 
                  Dict(:μ => 0.001, :σ² => 0.0004),
                  Dict(:μ => -0.001, :σ² => 0.0009)]
         sb = StickBreaking(weights, atoms)
@@ -108,7 +115,7 @@ using .DPM
     @testset "particle_filter_estep - Single Component" begin
         returns = randn(30) .* 0.01
         weights = [1.0]
-        atoms = [Dict(:μ => 0.0, :σ² => 0.0001)]
+        atoms = Any[Dict(:μ => 0.0, :σ² => 0.0001)]
         sb = StickBreaking(weights, atoms)
 
         pf_config = ParticleFilterConfig(100, 0.5)
@@ -122,7 +129,7 @@ using .DPM
         returns = randn(50) .* 0.01
         K = 10
         weights = fill(1.0/K, K)
-        atoms = [Dict(:μ => randn()*0.001, :σ² => 0.0001 + rand()*0.001) for _ in 1:K]
+        atoms = Any[Dict(:μ => randn()*0.001, :σ² => 0.0001 + rand()*0.001) for _ in 1:K]
         sb = StickBreaking(weights, atoms)
 
         pf_config = ParticleFilterConfig(200, 0.5)
@@ -140,7 +147,7 @@ using .DPM
         regime_probs = rand(50, 3)
         regime_probs ./= sum(regime_probs, dims=2)
 
-        atoms = [Dict(:μ => 0.0, :σ² => 0.0001), 
+        atoms = Any[Dict(:μ => 0.0, :σ² => 0.0001), 
                  Dict(:μ => 0.001, :σ² => 0.0004),
                  Dict(:μ => -0.001, :σ² => 0.0009)]
 
@@ -153,10 +160,12 @@ using .DPM
 
     @testset "mstep_update - Negligible Weight" begin
         returns = randn(50) .* 0.01
-        regime_probs = fill(1e-7, 50, 3)  # Very small weights
-        regime_probs[:, 1] .= 1.0 - 2e-7
+        # Weights must sum below the source's skip threshold (1e-6) across all 50
+        # obs for regimes 2,3 to be treated as negligible (left unchanged).
+        regime_probs = fill(1e-9, 50, 3)
+        regime_probs[:, 1] .= 1.0 - 2e-9
 
-        atoms = [Dict(:μ => 0.0, :σ² => 0.0001), 
+        atoms = Any[Dict(:μ => 0.0, :σ² => 0.0001), 
                  Dict(:μ => 0.001, :σ² => 0.0004),
                  Dict(:μ => -0.001, :σ² => 0.0009)]
 
@@ -236,7 +245,7 @@ using .DPM
     # recursive_update Tests
     # =========================================================================
     @testset "recursive_update - Basic" begin
-        prev = StickBreaking([0.33, 0.33, 0.34], [nothing, nothing, nothing])
+        prev = StickBreaking([0.33, 0.33, 0.34], Any[_mk_atom(), _mk_atom(), _mk_atom()])
         updated = recursive_update(prev, 0.01, 0.99)
 
         @test length(updated.weights) == 3
@@ -245,7 +254,7 @@ using .DPM
     end
 
     @testset "recursive_update - Forgetting Factor" begin
-        prev = StickBreaking([0.5, 0.3, 0.2], [nothing, nothing, nothing])
+        prev = StickBreaking([0.5, 0.3, 0.2], Any[_mk_atom(), _mk_atom(), _mk_atom()])
 
         updated_99 = recursive_update(prev, 0.01, 0.99)
         updated_95 = recursive_update(prev, 0.01, 0.95)
@@ -256,7 +265,7 @@ using .DPM
     end
 
     @testset "recursive_update - Large Return" begin
-        prev = StickBreaking([0.33, 0.33, 0.34], [nothing, nothing, nothing])
+        prev = StickBreaking([0.33, 0.33, 0.34], Any[_mk_atom(), _mk_atom(), _mk_atom()])
         updated = recursive_update(prev, 0.5, 0.99)  # Large return
 
         @test sum(updated.weights) ≈ 1.0 atol=1e-6
@@ -319,14 +328,14 @@ using .DPM
 
         @test length(weights) == 3
         @test sum(weights) ≈ 1.0 atol=1e-10
-        @test weights[1] ≈ 0.5
-        @test weights[2] ≈ 0.25 atol=1e-10
-        @test weights[3] ≈ 0.125 atol=1e-10
+        @test weights[1] ≈ 4/7
+        @test weights[2] ≈ 2/7 atol=1e-10
+        @test weights[3] ≈ 1/7 atol=1e-10
     end
 
     @testset "_collapse_components" begin
         weights = [0.5, 0.3, 0.15, 0.05]
-        atoms = fill(nothing, 4)
+        atoms = Vector{Any}(fill(nothing, 4))
         γ = 1.0
 
         collapsed = DPM._collapse_components(weights, atoms, γ)
@@ -376,7 +385,7 @@ using .DPM
 
     @testset "Recursive Update Sequence" begin
         # Simulate 30 days of recursive updates
-        params = StickBreaking([0.33, 0.33, 0.34], [nothing, nothing, nothing])
+        params = StickBreaking([0.33, 0.33, 0.34], Any[_mk_atom(), _mk_atom(), _mk_atom()])
 
         for t in 1:30
             ret = randn() * 0.01
