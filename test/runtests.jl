@@ -91,7 +91,13 @@ end
 @info ""
 @info "Total: $passed_count/$total_count test suites passed"
 
-if all_passed
+# Derive the verdict from module_results, not the `all_passed` global: the
+# helper's `all_passed = false` assigned a function-local (no `global`), so the
+# global stayed true and the runner reported success (and exited 0) even when
+# suites failed. module_results is mutated in place, so it is authoritative.
+suite_ok = passed_count == total_count
+
+if suite_ok
     @info ""
     @info "🎉 ALL TESTS PASSED - Framework production-ready"
 else
@@ -103,4 +109,4 @@ end
 
 # Gate exit code: non-zero on any failure so CI can gate on this runner
 # (PRE-01 / PRE-BL-01). Previously the runner always exited 0.
-exit(all_passed ? 0 : 1)
+exit(suite_ok ? 0 : 1)
