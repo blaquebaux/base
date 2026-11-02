@@ -16,13 +16,17 @@
 # Gate: run all three stratum test files first. If any fail, abort here.
 # =============================================================================
 
-include("GeometricCoordinationLayer.jl")
-include("StructuralStatistics.jl")
-include("ComputationalStatistics.jl")
-
+isdefined(Main, :GeometricCoordinationLayer) || include("../src/GeometricCoordinationLayer.jl")
+isdefined(Main, :StructuralStatistics) || include("../src/StructuralStatistics.jl")
+isdefined(Main, :ComputationalStatistics) || include("../src/ComputationalStatistics.jl")
 using .GeometricCoordinationLayer
 using .StructuralStatistics
 using .ComputationalStatistics
+# Modules do not `export`; bring the public API this suite uses into scope
+# explicitly (test-scoped), as the stratum suites do.
+using .GeometricCoordinationLayer: _chi2_sf
+using .StructuralStatistics: clean_covariance_rmt, compute_embargo_from_autocorr, generate_purged_splits
+using .ComputationalStatistics: _t_cdf, fit_ewma, fit_garch, validate_before_fit
 using LinearAlgebra, Statistics, Random, Test
 
 Random.seed!(20250518)
@@ -125,9 +129,16 @@ end
 Known factor model: R = F β' + ε. Returns data and ground truth.
 """
 function simulate_factor_returns(T::Int, k::Int; n_factors::Int=3,
-                                  noise_scale::Float64=0.01, seed::Int=0)
+                                  noise_scale::Float64=0.01, seed::Int=0,
+                                  persistence::Float64=0.0)
     Random.seed!(seed)
-    F    = randn(T, n_factors) .* 0.008
+    # persistence>0 makes factors AR(1) so this period's factor state predicts
+    # next period's returns (needed to test a signal's forecast power, L1-3).
+    shock = randn(T, n_factors) .* 0.008
+    F = similar(shock); F[1, :] = shock[1, :]
+    for t in 2:T
+        F[t, :] = persistence .* F[t-1, :] .+ sqrt(1 - persistence^2) .* shock[t, :]
+    end
     β    = randn(n_factors, k) .* 0.4
     ε    = randn(T, k) .* noise_scale
     R    = F * β .+ ε
@@ -167,7 +178,7 @@ for t in 21:T
 end
 
 mean_sig = mean(signal_counts) / k
-@test 0.15 ≤ mean_sig ≤ 0.50 "Signal frequency $(round(mean_sig*100,digits=1))% outside expected 15-50% range"
+@test 0.15 ≤ mean_sig ≤ 0.50
 end
 
 @testset "L1-2: Signal magnitude distribution is not degenerate" begin
@@ -175,17 +186,17 @@ T, k = 400, 20
 R, F, β, _ = simulate_factor_returns(T, k; n_factors=3, seed=11)
 scores = generate_signals(F, β)
 
-@test std(scores) > 0.5  "Signal has near-zero standard deviation — degenerate"
-@test !any(isnan.(scores)) "Signal contains NaN"
-@test !any(isinf.(scores)) "Signal contains Inf"
-@test maximum(abs.(scores)) < 10.0 "Signal magnitude unreasonably large — likely scaling issue"
+@test std(scores) > 0.5
+@test !any(isnan.(scores))
+@test !any(isinf.(scores))
+@test maximum(abs.(scores)) < 10.0
 end
 
 @testset "L1-3: Kendall tau between signal and next-period return is positive" begin
 # For a correctly specified factor model, the signal should predict
 # the direction of next-period returns with positive rank correlation.
 T, k = 600, 20
-R, F, β, _ = simulate_factor_returns(T, k; n_factors=3, noise_scale=0.005, seed=12)
+R, F, β, _ = simulate_factor_returns(T, k; n_factors=3, noise_scale=0.005, seed=12, persistence=0.9)
 
 taus = Float64[]
 for t in 20:T-1
@@ -202,7 +213,7 @@ for t in 20:T-1
 end
 
 mean_tau = mean(taus)
-@test mean_tau > 0.0 "Mean Kendall tau=$(round(mean_tau,digits=4)) is not positive — signal has no predictive content"
+@test mean_tau > 0.0
 end
 
 @testset "L1-4 (edge): Flat signal produces zero position" begin
@@ -213,9 +224,9 @@ F_flat = randn(T, 3) .* 0.001
 β_flat = ones(3, k)
 scores = generate_signals(F_flat, β_flat)
 
-@test std(scores) < 1e-6 "Flat signal should have zero std, got $(round(std(scores),sigdigits=2))"
+@test std(scores) < 1e-6
 w = construct_ls_portfolio(scores, I(k) * 0.01)
-@test norm(w) < 1e-6 "Flat signal should produce zero weights"
+@test norm(w) < 1e-6
 end
 
 @testset "L1-5 (edge): Opposing signals on same instrument resolve to priority direction" begin
@@ -225,9 +236,9 @@ scores_long  = [1.5, -0.5, 0.3, -1.2, 0.8]
 scores_short = [-1.5, 0.5, -0.3, 1.2, -0.8]
 net = scores_long .+ scores_short
 
-@test all(abs.(net) .< 2.0) "Net signal exceeds ±2σ on opposing signals"
+@test all(abs.(net) .< 2.0)
 w = construct_ls_portfolio(net, 0.001*I(5))
-@test all(abs.(w) .≤ 0.15 + 1e-10) "Position limit violated on opposing signals"
+@test all(abs.(w) .≤ 0.15 + 1e-10)
 end
 
 @testset "L1-6 (negative): NaN returns blocked before signal generation" begin
@@ -235,8 +246,8 @@ T, k = 200, 10
 R_bad = randn(T, k); R_bad[50, 3] = NaN
 
 ok, issues = validate_before_fit(R_bad)
-@test !ok "NaN data should fail validation gate"
-@test any(contains.(issues, "NaN")) "Gate should report NaN issue"
+@test !ok
+@test any(contains.(issues, "NaN"))
 end
 
 @testset "L1-7 (negative): Constant returns blocked before signal generation" begin
@@ -244,7 +255,7 @@ T, k = 200, 10
 R_const = ones(T, k)
 
 ok, issues = validate_before_fit(R_const)
-@test !ok "Constant returns should fail validation gate (zero variance)"
+@test !ok
 end
 
 end  # Layer 1
@@ -261,7 +272,7 @@ R, F, β, Σ_true = simulate_factor_returns(T, k; n_factors=3, seed=20)
 scores = generate_signals(F, β)
 
 w = construct_ls_portfolio(scores, Matrix(Σ_clean))
-@test abs(sum(w)) < 1e-8 "Portfolio is not dollar-neutral: sum(w)=$(round(sum(w),sigdigits=3))"
+@test abs(sum(w)) < 1e-8
 end
 
 @testset "L2-2: Gross exposure within limit" begin
@@ -273,7 +284,7 @@ scores = generate_signals(F, β)
 max_gross = 1.5
 w = construct_ls_portfolio(scores, Matrix(Σ_clean); max_gross=max_gross)
 gross = sum(abs.(w))
-@test gross ≤ max_gross + 1e-8 "Gross exposure $(round(gross,digits=3)) exceeds limit $max_gross"
+@test gross ≤ max_gross + 1e-8
 end
 
 @testset "L2-3: Individual position limits respected" begin
@@ -284,7 +295,7 @@ scores = generate_signals(F, β)
 
 max_pos = 0.10
 w = construct_ls_portfolio(scores, Matrix(Σ_clean); max_pos=max_pos)
-@test all(abs.(w) .≤ max_pos + 1e-8) "Position limit $max_pos violated: max=$(round(maximum(abs.(w)),digits=4))"
+@test all(abs.(w) .≤ max_pos + 1e-8)
 end
 
 @testset "L2-4: Daily turnover within budget" begin
@@ -304,7 +315,7 @@ for t in 20:T
 end
 
 mean_to = mean(turnovers)
-@test mean_to ≤ max_turnover + 0.05 "Mean daily turnover $(round(mean_to,digits=3)) exceeds budget $max_turnover"
+@test mean_to ≤ max_turnover + 0.05
 end
 
 @testset "L2-5 (edge): All-zero signals produce flat portfolio" begin
@@ -312,7 +323,7 @@ T, k = 200, 15
 Σ_clean = 0.01 * Matrix(I(k))
 w = construct_ls_portfolio(zeros(k), Σ_clean)
 
-@test norm(w) < 1e-6 "Zero signals should yield zero weights, got norm=$(round(norm(w),sigdigits=2))"
+@test norm(w) < 1e-6
 end
 
 @testset "L2-6 (edge): Near-singular covariance still produces valid weights" begin
@@ -327,9 +338,9 @@ R_sing = F_dom * β_dom .+ 0.001*randn(T, k)
 scores = randn(k)
 w = construct_ls_portfolio(scores, Matrix(Σ_sing))
 
-@test !any(isnan.(w)) "Weights contain NaN from near-singular covariance"
-@test !any(isinf.(w)) "Weights contain Inf from near-singular covariance"
-@test abs(sum(w)) < 1e-8 "Portfolio not neutral after near-singular covariance"
+@test !any(isnan.(w))
+@test !any(isinf.(w))
+@test abs(sum(w)) < 1e-8
 end
 
 @testset "L2-7 (negative): Non-PSD covariance flagged before use" begin
@@ -338,11 +349,11 @@ k = 10
 Σ_bad = randn(k, k); Σ_bad = Σ_bad'Σ_bad
 Σ_bad[1, 1] -= 2 * maximum(eigvals(Symmetric(Σ_bad)))  # force negative eigenvalue
 
-@test !isposdef(Symmetric(Σ_bad)) "Test setup: covariance should not be PD"
+@test !isposdef(Symmetric(Σ_bad))
 
 # RMT cleaning should fix it and report the issue
 Σ_fixed, rpt = clean_covariance_rmt(Symmetric(Σ_bad + 0.5*I(k)), 100)
-@test isposdef(Σ_fixed) "RMT cleaning should produce PD matrix"
+@test isposdef(Σ_fixed)
 end
 
 @testset "L2-8 (negative): p/n > 0.5 flagged before PCA in portfolio construction" begin
@@ -351,8 +362,8 @@ n_obs, k = 80, 60   # p/n = 0.75 >> 0.5
 R_highdim = randn(n_obs, k)
 
 ok, issues = validate_before_fit(R_highdim; tool=:pca)
-@test !ok "High p/n should fail validation"
-@test any(contains.(i, "p/n") for i in issues) "Should flag p/n ratio"
+@test !ok
+@test any(contains.(i, "p/n") for i in issues)
 end
 
 end  # Layer 2
@@ -382,8 +393,8 @@ n_obs    = length(breaches)
 lr_stat, lr_p = kupiec_lr(n_obs, n_breach, alpha)
 
 actual_rate = n_breach / n_obs
-@test abs(actual_rate - alpha) < 0.025 "VaR breach rate $(round(actual_rate,digits=3)) far from $alpha"
-@test lr_p > 0.01 "Kupiec LR rejects VaR calibration (p=$(round(lr_p,digits=4)))"
+@test abs(actual_rate - alpha) < 0.025
+@test lr_p > 0.01
 end
 
 @testset "L3-2: Kupiec test rejects misspecified VaR (negative)" begin
@@ -398,7 +409,7 @@ var_low = var_hist(r_low, alpha)   # VaR from low-vol — too small for high-vol
 breaches = sum(r_high .< -var_low)
 lr_stat, lr_p = kupiec_lr(T, breaches, alpha)
 
-@test lr_p < 0.05 "Misspecified VaR should be rejected by Kupiec (p=$(round(lr_p,digits=4)))"
+@test lr_p < 0.05
 end
 
 @testset "L3-3: GARCH forecast quality — Mincer-Zarnowitz R² > 0.1" begin
@@ -423,8 +434,8 @@ h  = g.sigma2[1:end-1]
 rv = r_use[2:end].^2   # realised variance proxy
 
 intercept, slope, r2 = mincer_zarnowitz(h, rv)
-@test r2 > 0.05 "GARCH Mincer-Zarnowitz R²=$(round(r2,digits=3)) < 0.05 — forecast has no power"
-@test slope > 0.3 "GARCH slope=$(round(slope,digits=3)) < 0.3 — forecast direction wrong"
+@test r2 > 0.05
+@test slope > 0.3
 end
 
 @testset "L3-4: t-Copula tail dependence > Gaussian tail dependence (use case)" begin
@@ -439,7 +450,7 @@ L  = cholesky(Symmetric(R_true)).L
 sim_u = zeros(T, k)
 for i in 1:T
     Z = L * randn(k)
-    W = sum(randn(ν_int)^2 for _ in 1:ν_int) / ν
+    W = sum(randn()^2 for _ in 1:ν_int) / ν
     X = Z ./ sqrt(W)
     sim_u[i, :] = [ComputationalStatistics._t_cdf(x, ν) for x in X]
 end
@@ -453,8 +464,8 @@ marginal_joint_gaussian = q^2   # independence bound
 z_t = -sqrt((ν+1)*(1-0.6)/(1+0.6))
 λ_L = 2 * ComputationalStatistics._t_cdf(z_t, ν+1)
 
-@test joint_tail > marginal_joint_gaussian "t-Copula should exceed independence tail prob"
-@test joint_tail > q^2 * 2 "t-Copula empirical tail dependence too low vs theoretical"
+@test joint_tail > marginal_joint_gaussian
+@test joint_tail > q^2 * 2
 end
 
 @testset "L3-5 (edge): GARCH vol adapts after volatility regime change" begin
@@ -470,7 +481,7 @@ g = fit_garch(r_all)
 σ_pre  = mean(sqrt.(g.sigma2[T_low-20:T_low]))
 σ_post = mean(sqrt.(g.sigma2[T_low+10:end]))
 
-@test σ_post > σ_pre * 1.5 "GARCH failed to adapt: pre=$(round(σ_pre,sigdigits=3)) post=$(round(σ_post,sigdigits=3))"
+@test σ_post > σ_pre * 1.5
 end
 
 @testset "L3-6 (edge): EWMA adapts faster than GARCH in crypto-style vol spikes" begin
@@ -490,7 +501,7 @@ t_spike = T_low + 2
 σ_garch = sqrt(g.sigma2[t_spike])
 
 # EWMA reacts more to the spike (higher σ right after)
-@test σ_ewma ≥ σ_garch * 0.8 "EWMA should react at least as fast as GARCH to vol spike"
+@test σ_ewma ≥ σ_garch * 0.8
 end
 
 @testset "L3-7 (negative): Embargo=0 inflates Sharpe vs derived embargo" begin
@@ -525,9 +536,9 @@ end
 sh_leak  = cv_sharpe(splits_leak,  ar1_returns)
 sh_clean = cv_sharpe(splits_clean, ar1_returns)
 
-@test sh_leak ≥ sh_clean "Leaking CV should produce equal or higher reported Sharpe"
+@test sh_leak ≥ sh_clean
 inflation = sh_leak - sh_clean
-@test inflation ≥ 0.0 "Sharpe inflation from leakage should be non-negative: $inflation"
+@test inflation ≥ 0.0
 
 # Log the inflation for human review
 if inflation > 0.1
@@ -547,13 +558,13 @@ R, _, _, Σ_true = simulate_factor_returns(T, k; n_factors=3,
 Σ_clean, _  = clean_covariance_rmt(cov(R), T; method=:shrink_trace_preserving)
 
 # Both should be valid SPD matrices
-@test isposdef(Symmetric(Σ_clean)) "RMT-cleaned covariance not PD"
-@test minimum(eigvals(Symmetric(Σ_clean))) > 0 "RMT-cleaned has non-positive eigenvalue"
+@test isposdef(Symmetric(Σ_clean))
+@test minimum(eigvals(Symmetric(Σ_clean))) > 0
 
 # Condition number should be substantially lower after cleaning
 cond_raw   = cond(Symmetric(cov(R)))
 cond_clean = cond(Symmetric(Σ_clean))
-@test cond_clean < cond_raw "RMT cleaning should reduce condition number"
+@test cond_clean < cond_raw
 end
 
 end  # Layer 3

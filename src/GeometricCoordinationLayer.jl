@@ -23,6 +23,7 @@
 module GeometricCoordinationLayer
 
 using LinearAlgebra, Statistics, Random
+using SpecialFunctions: loggamma   # _chi2_sf needs log Γ; was referenced as lgamma but never imported
 
 # =============================================================================
 # PART 0 — GEOMETRY TYPE HIERARCHY
@@ -117,19 +118,22 @@ end
 """
     ai_parallel_transport(P, Q, X) → tangent vector at Q
 
-Closed-form parallel transport along geodesic P → Q in AI geometry:
-τ_{P→Q}(X) = Q^{1/2}(Q^{-1/2} P Q^{-1/2})^{1/2} P^{-1/2} X P^{-1/2}
-              (Q^{-1/2} P Q^{-1/2})^{1/2} Q^{1/2}
+Closed-form parallel transport along the geodesic P → Q in AI geometry:
+τ_{P→Q}(X) = E X Eᵀ,  E = (Q P⁻¹)^{1/2} = P^{1/2} (P^{-1/2} Q P^{-1/2})^{1/2} P^{-1/2}.
 
-This is exact (not an approximation). It preserves the AI inner product:
-⟨X, Y⟩_P = ⟨τX, τY⟩_Q.
+This is exact (not an approximation) and is the AI-metric isometry: with
+E² = Q P⁻¹ one has Eᵀ Q⁻¹ E = P⁻¹, so ⟨X, Y⟩_P = ⟨τX, τY⟩_Q. (The earlier
+Q-centred form Q^{1/2}(Q^{-1/2}PQ^{-1/2})^{1/2}P^{-1/2}… was NOT an isometry; the
+inner product drifted with the condition number, which test_geometric_consistency
+Test 2 catches.)
 """
 function ai_parallel_transport(P::AbstractMatrix{Float64},
                                 Q::AbstractMatrix{Float64},
                                 X::AbstractMatrix{Float64})
-    sqQ  = _spd_sqrt(Q); isqQ = _spd_sqrt_inv(Q); isqP = _spd_sqrt_inv(P)
-    M    = _spd_sqrt(Symmetric(isqQ * P * isqQ))
-    Symmetric(sqQ * M * isqP * X * isqP * M * sqQ)
+    sqP  = _spd_sqrt(P); isqP = _spd_sqrt_inv(P)
+    R    = _spd_sqrt(Symmetric(isqP * Q * isqP))   # (P^{-1/2} Q P^{-1/2})^{1/2}
+    E    = sqP * R * isqP                            # E = (Q P⁻¹)^{1/2}
+    Symmetric(E * X * E')                            # τ(X) = E X Eᵀ
 end
 
 # =============================================================================
@@ -850,7 +854,7 @@ function _gamma_sf(a::Float64, x::Float64)
             t *= x/(a+n); s += t
             abs(t) < abs(s)*1e-12 && break
         end
-        return max(0.0, min(1.0, 1.0 - s*exp(-x + a*log(x) - lgamma(a))))
+        return max(0.0, min(1.0, 1.0 - s*exp(-x + a*log(x) - loggamma(a))))
     else
         b = x+1-a; c = 1e30; d = 1.0/(x+1-a); h = d
         for i in 1:200
@@ -859,7 +863,7 @@ function _gamma_sf(a::Float64, x::Float64)
             Δ  = d*c; h *= Δ
             abs(Δ - 1.0) < 1e-12 && break
         end
-        return max(0.0, min(1.0, exp(-x + a*log(x) - lgamma(a))*h))
+        return max(0.0, min(1.0, exp(-x + a*log(x) - loggamma(a))*h))
     end
 end
 

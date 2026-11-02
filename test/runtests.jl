@@ -58,6 +58,7 @@ run_module_tests("Live Execution Integration (venue+ledger+audit)", "test_live_i
 
 run_module_tests("Stratum I: Computational Statistics (PCA / GARCH / VAR / t-copula)", "test_stratum_i.jl")
 run_module_tests("Stratum II: Structural Statistics (RMT / HMM regimes / RPCA / purged CV)", "test_stratum_ii.jl")
+run_module_tests("Geometric Consistency (manifold invariants: AI/BW/LE)", "test_geometric_consistency.jl")
 
 # Integration Tests
 @info ""
@@ -66,6 +67,7 @@ run_module_tests("Stratum II: Structural Statistics (RMT / HMM regimes / RPCA / 
 
 run_module_tests("End-to-End Integration", "test_integration.jl")
 run_module_tests("Spine Pipeline (cached data → governed → ledger)", "test_spine_pipeline.jl")
+run_module_tests("Backtest Integrity (signal → portfolio → risk layers)", "test_backtest_integrity.jl")
 
 # Stress Tests
 @info ""
@@ -73,6 +75,7 @@ run_module_tests("Spine Pipeline (cached data → governed → ledger)", "test_s
 @info "-"^50
 
 run_module_tests("Stress & Edge Cases", "test_stress.jl")
+run_module_tests("Stress Scenarios (regime / adversarial + architecture negatives)", "test_stress_scenarios.jl")
 
 # Summary
 @info ""
