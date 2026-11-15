@@ -216,10 +216,13 @@ eu  = ensure_spd(sum(samples) ./ N)
 # Sum of squared AI distances
 ai_dist_sq(C, mats) = sum(norm(ai_log(C, P), 2)^2 for P in mats)
 @test ai_dist_sq(fm.mean, samples) ≤ ai_dist_sq(eu, samples) + 1e-6 * N
-# DEFERRED (G0 follow-up): the Fréchet mean is correct (assertion above passes),
-# but the Karcher-flow gradient norm does not reach tol=1e-10 within max_iter on
-# these very noisy samples, so `converged` stays false. Whether to loosen tol,
-# raise max_iter, or damp the step is the open question. Tracked, not dropped.
+# DEFERRED (G0 follow-up): empirically re-diagnosed. The Fréchet mean is correct
+# (assertion above passes), but the unit-step Karcher flow does not merely converge
+# slowly — on most random seeds it STALLS or oscillates at a large gradient residual
+# (e.g. ~2.6, ~1.1 for some seeds; non-monotonic vs max_iter), so raising max_iter
+# does not help and the full step overshoots. A correct fix is a proper Riemannian
+# optimiser (variance line-search / CG / trust-region), not a tol or iteration tweak.
+# Tracked as real numerical-methods debt, not dropped.
 @test_broken fm.converged
 end
 

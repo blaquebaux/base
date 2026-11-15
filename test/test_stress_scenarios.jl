@@ -292,10 +292,14 @@ ewma_result = fit_ewma(r_agg; λ=0.94)
 vol_pre   = mean(sqrt.(ewma_result.sigma2[T_pre-20:T_pre]))
 vol_event = mean(sqrt.(ewma_result.sigma2[ev_start:ev_end]))
 
-# DEFERRED (G0 follow-up): this asserts a 1.5x vol spike in a correlation-COLLAPSE
-# scenario, where the portfolio-aggregate EWMA vol may fall (diversification) rather
-# than spike. The assertion likely mismatches the scenario; revisit what a collapse
-# should do to aggregate vol. Tracked, not silently dropped.
+# DEFERRED (G0 follow-up): empirically re-diagnosed. The generator sets event
+# correlation -> 1 (a contagion "collapse of diversification"), so aggregate vol
+# RISES, not falls — the earlier "diversification lowers vol" note was wrong. The
+# real blocker is the measurement: EWMA(λ=0.94) has a ~1/(1-λ)≈16-step memory, so a
+# 3-step event cannot move the filter 1.5x (measured ratio ≈0.9 for this seed), and
+# 3 i.i.d. factor draws have very noisy realised vol. A correct test needs a longer
+# event / larger shock or a peak-over-adaptation-window read — a fixture redesign,
+# not a parameter tweak. Tracked, not silently dropped.
 @test_broken vol_event > vol_pre * 1.5
 end
 
@@ -483,11 +487,17 @@ _, rpt = convert_geometry(p_ai, BuresWasserstein())
 end
 
 @testset "L6-8: GARCH Ito convention flag triggers Stratum III note" begin
-# DEFERRED (G0 follow-up): fit_garch has no `convention` kwarg yet, so the
-# Ito/Stratonovich-correction annotation is an unimplemented feature. Checked via
-# hasmethod (no throw) and marked broken so it flags if the feature is added.
-@test_broken any(m -> :convention in Base.kwarg_decl(m),
-                 methods(fit_garch))
+# fit_garch exposes `convention` as a keyword; :stratonovich attaches the
+# Itô–Stratonovich correction note (Stratum III) to the validation report.
+@test any(m -> :convention in Base.kwarg_decl(m), methods(fit_garch))
+
+# The keyword actually drives the annotation, not just the method signature.
+r = randn(120) .* 0.01
+note_marker = "Stratonovich"
+ito   = fit_garch(r; convention=:ito)
+strat = fit_garch(r; convention=:stratonovich)
+@test !any(contains(n, note_marker) for n in ito.validation.notes)
+@test  any(contains(n, note_marker) for n in strat.validation.notes)
 end
 
 # ── 6.3 REGIME DETECTION FAILURE MODES ───────────────────────────────────────
