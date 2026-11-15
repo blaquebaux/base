@@ -483,13 +483,29 @@ function _numerical_grad(f::Function, θ::Vector{Float64}; h::Float64=1e-6)
 end
 
 """
-    fit_garch(r, config) → GARCHResult
+    fit_garch(r, config; convention=config.convention) → GARCHResult
 
 Projected gradient descent GARCH(1,1) without Optim.jl.  (K2)
 Constraints enforced at every step: ω>0, α≥0, β≥0, α+β<1.
 Warm-started from method-of-moments.
+
+`convention` (`:ito` | `:stratonovich`) selects the SDE discretisation convention.
+It defaults to the config's own setting, so callers that only pass a config are
+unaffected; passing the keyword overrides it, e.g. `fit_garch(r; convention=:stratonovich)`,
+which attaches the Itô–Stratonovich correction note (Stratum III) to the validation
+report. Exposing it as a keyword lets Stratum III wire the convention without
+constructing a full GARCHConfig.
 """
-function fit_garch(r::AbstractVector{Float64}, config::GARCHConfig=GARCHConfig())
+function fit_garch(r::AbstractVector{Float64}, config::GARCHConfig=GARCHConfig();
+                   convention::Symbol=config.convention)
+    # Keyword override: thread an explicit convention into the config it flows
+    # through (the Stratonovich annotation below reads config.convention).
+    if convention != config.convention
+        config = GARCHConfig(max_iter=config.max_iter, lr0=config.lr0,
+                             lr_decay=config.lr_decay, lb_lags=config.lb_lags,
+                             convention=convention,
+                             var_mismatch_threshold=config.var_mismatch_threshold)
+    end
     pre   = String[]
     any(isnan.(r)) && push!(pre, "Returns contain NaN.")
     any(isinf.(r)) && push!(pre, "Returns contain Inf.")
