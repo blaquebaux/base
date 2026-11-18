@@ -195,10 +195,14 @@ stab_cross = rolling_eigenvector_stability(R[T_pre-30:end, :],    60; n_componen
 
 # Pre-crisis should be stable; cross-spike should show instability
 @test stab_pre[1] > 0.7
-# DEFERRED (G0 follow-up): a 0.2->0.9 correlation spike does not drop
-# rolling_eigenvector_stability in the cross window here. Open question whether
-# the detector or the window alignment (window=60 over a 30-step spike) is at
-# fault, or the scenario needs a sharper break. Tracked, not silently dropped.
+# DEFERRED (G0 follow-up): empirically re-diagnosed. A correlation spike does NOT
+# rotate the leading eigenvector, so stability is the wrong signal: measured mean
+# stability is pre=0.992 vs cross=0.993 (flat, not a drop), because "all assets
+# move together" is roughly the same leading direction before and after. What
+# actually jumps is the top factor's variance-explained (~0.12 -> ~0.19). The right
+# detector for a correlation spike is the top-eigenvalue / variance-explained jump,
+# not eigenvector rotation; fixing the test means asserting that signal (a detector
+# choice), not tuning the window. Tracked, not silently dropped.
 @test_broken stab_cross[1] < stab_pre[1]
 end
 

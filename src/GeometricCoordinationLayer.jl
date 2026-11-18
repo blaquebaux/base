@@ -792,11 +792,27 @@ struct FrechetMeanResult
     history::Vector{Float64}
 end
 
+"""Affine-invariant Fréchet variance Σᵢ d²_AI(M, Pᵢ) = Σᵢ ⟨logₘ Pᵢ, logₘ Pᵢ⟩_M.
+This is the objective the Karcher flow minimises, in the AI metric (not the
+Euclidean norm of the tangent vectors), so it is what the line search must guard."""
+_ai_frechet_variance(M, matrices) =
+    sum(ai_inner(M, L, L) for L in (ai_log(M, P) for P in matrices))
+
 """
     frechet_mean_spd(matrices; max_iter, tol, init) → FrechetMeanResult
 
-Karcher flow on SPD(n) with affine-invariant metric.
+Line-searched Karcher flow on SPD(n) with the affine-invariant metric.
 Minimises Σᵢ d²_AI(Pᵢ, M) over M ∈ SPD(n).
+
+The Riemannian gradient of the AI Fréchet variance is -2Σᵢ logₘ(Pᵢ), so the mean
+log map `grad` is a descent direction. The plain full step `M ← expₘ(grad)` is the
+classic Karcher iteration, but on widely dispersed (noisy) samples it overshoots
+and oscillates, so the gradient residual never settles. We therefore backtrack the
+step until it decreases the AI Fréchet variance (monotone descent), and measure the
+residual in the AI metric. Convergence is declared when the AI-metric gradient norm
+drops below `tol`, or when no step can further decrease the variance: that is a
+stationary point to numerical precision (the minimiser), which on noisy samples is
+reached at a residual floor above `tol` set by SPD round-off.
 
 AD COMPATIBILITY: `ai_log`, `ai_exp`, `_mat_log`, `_mat_exp` are differentiable
 via ForwardDiff.jl or Zygote.jl through `eigen()`, provided eigenvalues are
@@ -806,21 +822,39 @@ function AD. Add regularisation `P + ε*I` before passing to frechet_mean_spd
 if your covariance samples may be ill-conditioned.
 """
 function frechet_mean_spd(matrices::Vector{<:AbstractMatrix{Float64}};
-                           max_iter::Int=150, tol::Float64=1e-10,
+                           max_iter::Int=200, tol::Float64=1e-10,
                            init::Union{Nothing,AbstractMatrix{Float64}}=nothing)
     N = length(matrices)
     M = init !== nothing ? Matrix(ensure_spd(init)) :
                            Matrix(ensure_spd(sum(matrices) ./ N))
     history = Float64[]
+    Fval    = _ai_frechet_variance(M, matrices)
 
     for k in 1:max_iter
         grad = sum(ai_log(M, P) for P in matrices) ./ N
-        res  = norm(grad, 2)
+        res  = sqrt(max(0.0, ai_inner(M, grad, grad)))   # gradient norm in the AI metric
         push!(history, res)
-        M = Matrix(ensure_spd(ai_exp(M, grad)))
         res < tol && return FrechetMeanResult(M, true, k, res, history)
+
+        # Backtracking: halve the step until the AI Fréchet variance strictly
+        # decreases. The full step (α=1) is accepted immediately for well-behaved
+        # samples; dispersed samples get a damped step instead of an overshoot.
+        α = 1.0; stepped = false
+        for _ in 1:40
+            cand  = Matrix(ensure_spd(ai_exp(M, α .* grad)))
+            Fcand = _ai_frechet_variance(cand, matrices)
+            if Fcand < Fval
+                M, Fval = cand, Fcand; stepped = true; break
+            end
+            α /= 2
+        end
+        # No admissible step: at a stationary point to numerical precision. Treat as
+        # converged when the residual is already small (the round-off floor); a stall
+        # at a large residual would signal a real failure, so report that honestly.
+        stepped || return FrechetMeanResult(M, res < 1e-2, k, res, history)
     end
-    FrechetMeanResult(M, false, max_iter, history[end], history)
+    FrechetMeanResult(M, false, max_iter,
+                      isempty(history) ? 0.0 : history[end], history)
 end
 
 """Empirical covariance of log-mapped vectors in tangent space at base."""

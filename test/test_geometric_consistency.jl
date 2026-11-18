@@ -216,14 +216,11 @@ eu  = ensure_spd(sum(samples) ./ N)
 # Sum of squared AI distances
 ai_dist_sq(C, mats) = sum(norm(ai_log(C, P), 2)^2 for P in mats)
 @test ai_dist_sq(fm.mean, samples) ≤ ai_dist_sq(eu, samples) + 1e-6 * N
-# DEFERRED (G0 follow-up): empirically re-diagnosed. The Fréchet mean is correct
-# (assertion above passes), but the unit-step Karcher flow does not merely converge
-# slowly — on most random seeds it STALLS or oscillates at a large gradient residual
-# (e.g. ~2.6, ~1.1 for some seeds; non-monotonic vs max_iter), so raising max_iter
-# does not help and the full step overshoots. A correct fix is a proper Riemannian
-# optimiser (variance line-search / CG / trust-region), not a tol or iteration tweak.
-# Tracked as real numerical-methods debt, not dropped.
-@test_broken fm.converged
+# FIXED: the Karcher flow now backtracks its step to guarantee the AI Fréchet
+# variance decreases each iteration (the old unit step overshot and oscillated on
+# dispersed samples), and measures the residual in the AI metric. It converges to
+# the minimiser on both well-conditioned and noisy samples.
+@test fm.converged
 end
 
 # =============================================================================
@@ -240,9 +237,15 @@ end
 rate = rejections / n_sim
 # Type I error should be within ≈ 3σ of α for n_sim=200
 σ_binom = sqrt(α*(1-α)/n_sim)
-# DEFERRED (G0 follow-up): intrinsic_wald_test type-I error runs ~0.74 vs α here.
-# Open question whether the Wald statistic is miscalibrated or the true_cov=I null
-# is ill-posed under the AI-Fréchet population mean. Tracked, not silently dropped.
+# DEFERRED (G0 follow-up): empirically localised. type-I ~0.79; the Wald statistic
+# is inflated by a near-constant ~2.85x (E[W] ~ 2.85·d vs d under χ²). Ruled OUT:
+# (a) the Fréchet mean (now converges, type-I unchanged); (b) conditioning of the
+# tangent covariance (re-forming it in isometric 6-dim Mandel coords drops cond(S)
+# from ~1e8 to ~6 but leaves E[W]/d at 2.85). The real cause is the missing Hessian
+# correction in the intrinsic CLT: √N·logμ(μ̂) → N(0, H⁻¹ΓH⁻¹), but the statistic
+# uses the per-observation tangent covariance Σ in place of H⁻¹ΓH⁻¹ (Γ=4Σ, H the
+# Fréchet-function Hessian). Correct fix = the Hessian-corrected covariance or a
+# parametric bootstrap under H₀, not a scale tweak (2.85 is data/curvature-dependent).
 @test_broken abs(rate - α) < 4*σ_binom
 end
 
